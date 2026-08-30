@@ -5,7 +5,8 @@
 	"name": "MicroTimingReplay",
 	"description": "Record micro events and replay them!",
 	"authors": [
-		"Ryan100C"
+		"Ryan100C",
+		"bulefire-fox"
 	],
 	"contact": {
 		"homepage": "https://github.com/hotpad100c/MicroTimingReplay",
