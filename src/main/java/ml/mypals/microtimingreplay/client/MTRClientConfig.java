@@ -34,6 +34,10 @@ public class MTRClientConfig {
     private static boolean followCursor = true;
     private static int panelHoldMillis = 0;
     private static boolean hideMarkers = false;
+    /** Timeline layout preferences are client-wide, so they survive profile/world changes. */
+    private static int timelinePanelWidth = -1;
+    private static int timelineLeftFontPercent = 100;
+    private static int timelineRightFontPercent = 100;
 
     private static File configFile() {
         return new File(new File(FabricLoader.getInstance().getConfigDir().toFile(), "mtr"), "client.json");
@@ -114,6 +118,39 @@ public class MTRClientConfig {
         save();
     }
 
+    public static int timelinePanelWidth() {
+        return timelinePanelWidth;
+    }
+
+    public static void setTimelinePanelWidth(int width) {
+        int normalized = width < 0 ? -1 : Math.max(1, width);
+        if (timelinePanelWidth == normalized) return;
+        timelinePanelWidth = normalized;
+        save();
+    }
+
+    public static int timelineLeftFontPercent() {
+        return timelineLeftFontPercent;
+    }
+
+    public static void setTimelineLeftFontPercent(int percent) {
+        int normalized = Math.clamp(percent, 5, 200);
+        if (timelineLeftFontPercent == normalized) return;
+        timelineLeftFontPercent = normalized;
+        save();
+    }
+
+    public static int timelineRightFontPercent() {
+        return timelineRightFontPercent;
+    }
+
+    public static void setTimelineRightFontPercent(int percent) {
+        int normalized = Math.clamp(percent, 5, 200);
+        if (timelineRightFontPercent == normalized) return;
+        timelineRightFontPercent = normalized;
+        save();
+    }
+
     public static void load() {
         File file = configFile();
         if (!file.exists()) {
@@ -132,6 +169,16 @@ public class MTRClientConfig {
             if (json.has("followCursor")) followCursor = json.get("followCursor").getAsBoolean();
             if (json.has("panelHoldMillis")) panelHoldMillis = Math.clamp(json.get("panelHoldMillis").getAsInt(), 0, 2000);
             if (json.has("hideMarkers")) hideMarkers = json.get("hideMarkers").getAsBoolean();
+            if (json.has("timelinePanelWidth")) {
+                int width = json.get("timelinePanelWidth").getAsInt();
+                timelinePanelWidth = width < 0 ? -1 : Math.max(1, width);
+            }
+            if (json.has("timelineLeftFontPercent")) {
+                timelineLeftFontPercent = Math.clamp(json.get("timelineLeftFontPercent").getAsInt(), 5, 200);
+            }
+            if (json.has("timelineRightFontPercent")) {
+                timelineRightFontPercent = Math.clamp(json.get("timelineRightFontPercent").getAsInt(), 5, 200);
+            }
         } catch (Exception e) {
             MicroTimingReplay.LOGGER.error("Failed to read client.json, falling back to defaults", e);
         }
@@ -146,6 +193,9 @@ public class MTRClientConfig {
         root.addProperty("followCursor", followCursor);
         root.addProperty("panelHoldMillis", panelHoldMillis);
         root.addProperty("hideMarkers", hideMarkers);
+        root.addProperty("timelinePanelWidth", timelinePanelWidth);
+        root.addProperty("timelineLeftFontPercent", timelineLeftFontPercent);
+        root.addProperty("timelineRightFontPercent", timelineRightFontPercent);
 
         try {
             if (!file.getParentFile().exists()) {
