@@ -11,8 +11,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.NonNull;
 
-import java.awt.*;
-
 @Environment(EnvType.CLIENT)
 public class MTRWidgets {
 
