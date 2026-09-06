@@ -8,6 +8,8 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.FormattedCharSequence;
+import org.jspecify.annotations.NonNull;
 
 @Environment(EnvType.CLIENT)
 public class MTRWidgets {
@@ -46,6 +48,28 @@ public class MTRWidgets {
         int background = active ? CARD_BG_ACTIVE : hovered ? CARD_BG_HOVER : CARD_BG;
         panel(graphics, x, y, width, height, background, CARD_BORDER);
         graphics.centeredText(font, label, x + width / 2, y + (height - font.lineHeight) / 2 + 1, TEXT);
+    }
+
+    public static void scaledText(@NonNull GuiGraphicsExtractor graphics, Component text, int x, int y, int color, Font font, float scale) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
+        graphics.pose().scale(scale, scale);
+        graphics.text(font, text, 0, 0, color);
+        graphics.pose().popMatrix();
+    }
+
+    public static void scaledText(@NonNull GuiGraphicsExtractor graphics, FormattedCharSequence text,
+                                  int x, int y, int color, Font font, float scale) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
+        graphics.pose().scale(scale, scale);
+        graphics.text(font, text, 0, 0, color);
+        graphics.pose().popMatrix();
+    }
+
+    /** Returns the font's line box, including its normal two-pixel leading, scaled with the text. */
+    public static int scaledLineHeight(@NonNull Font font, float scale) {
+        return Math.max(1, Math.round((font.lineHeight + 2) * scale));
     }
 
     public static boolean isOver(double mouseX, double mouseY, int x, int y, int width, int height) {

@@ -1,11 +1,13 @@
 package ml.mypals.microtimingreplay.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import ml.mypals.microtimingreplay.MicroTimingReplay;
 import ml.mypals.microtimingreplay.client.ClientReplayState;
 import ml.mypals.microtimingreplay.client.MTRClientConfig;
 import ml.mypals.microtimingreplay.client.MTRClientNetworking;
 import ml.mypals.microtimingreplay.client.TimelineAutoHide;
 import ml.mypals.microtimingreplay.client.camera.ViewportCamera;
+import ml.mypals.microtimingreplay.client.iconcomponents.IconButton;
 import ml.mypals.microtimingreplay.network.MTRPayloads;
 import ml.mypals.microtimingreplay.util.MTRComponent;
 import ml.mypals.microtimingreplay.util.MTRHelpText;
@@ -14,10 +16,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.components.WidgetTooltipHolder;
+import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -25,6 +24,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ClipContext;
@@ -70,12 +70,21 @@ public class TimelineScreen extends Screen {
 
     private static final int TOOLTIP_TRACE_LINES = 20;
     private static final double SUMMARY_MAX_SHARE = 0.5;
+    private static final int FONT_MIN_PERCENT = 5;
+    private static final int FONT_MAX_PERCENT = 200;
 
     private final Set<Integer> collapsed = new HashSet<>();
     private List<Integer> visible = new ArrayList<>();
+    /** Number of rendered timeline rows, including the extra Tick separator rows. */
+    private int timelineContentSlots = 0;
 
     /** Shared by the list and the detail column, so the two read as a matched pair. */
+    private float fontScale = 1.0f;
+
     private int panelWidth = WIDTH_AT_SCALE_1;
+    private int panelWidthOverride = -1;
+    private float leftFontScale = 1.0F;
+    private float rightFontScale = 1.0F;
 
     private int scroll = 0;
     private int hScroll = 0;
@@ -110,6 +119,23 @@ public class TimelineScreen extends Screen {
 
     /** The manual overlay, drawn over everything and dismissed by any key or click. */
     private boolean helpOpen = false;
+    private boolean settingsOpen = false;
+    private boolean settingsInputMode = false;
+
+    private final List<AbstractWidget> mainWidgets = new ArrayList<>();
+    private final List<AbstractWidget> settingsWidgets = new ArrayList<>();
+    private SidebarWidthSlider sidebarWidthSlider;
+    private EditBox sidebarWidthInput;
+    private LeftFontSlider leftFontSlider;
+    private EditBox leftFontInput;
+    private RightFontSlider rightFontSlider;
+    private EditBox rightFontInput;
+    private Button settingsModeButton;
+    private Button settingsDoneButton;
+    private int settingsBoxX;
+    private int settingsBoxY;
+    private int settingsBoxWidth;
+    private int settingsBoxHeight;
 
     private EditBox searchBox;
     private List<Integer> matches = List.of();
@@ -127,6 +153,9 @@ public class TimelineScreen extends Screen {
 
     public TimelineScreen() {
         super(MTRComponent.translatable("mtr.timeline.title", "MTR Timeline"));
+        panelWidthOverride = MTRClientConfig.timelinePanelWidth();
+        leftFontScale = MTRClientConfig.timelineLeftFontPercent() / 100.0F;
+        rightFontScale = MTRClientConfig.timelineRightFontPercent() / 100.0F;
     }
 
     private List<MTRPayloads.TimelineRow> rows() {
@@ -142,12 +171,51 @@ public class TimelineScreen extends Screen {
         int preferred = Math.max(MIN_PANEL_WIDTH, WIDTH_AT_SCALE_1 - (scale - 1) * WIDTH_PER_SCALE);
 
         // A small window at scale 1 can be narrower than two preferred columns.
-        int fits = (this.width - LIST_X - EDGE_PAD - MIN_MIDDLE_GAP) / 2;
-        return Math.max(1, Math.min(preferred, fits));
+        int fits = Math.max(MIN_PANEL_WIDTH, (this.width - LIST_X - EDGE_PAD - MIN_MIDDLE_GAP) / 2);
+        int autoWidth = Math.max(1, Math.min(preferred, fits));
+        if (panelWidthOverride > 0) {
+            return Math.clamp(panelWidthOverride, 1, fits);
+        }
+
+        return autoWidth;
+    }
+
+    public void setPanelWidthOverride(int width) {
+        int fits = Math.max(
+                MIN_PANEL_WIDTH,
+                (this.width - LIST_X - EDGE_PAD - MIN_MIDDLE_GAP) / 2
+        );
+        panelWidthOverride = Math.clamp(width, MIN_PANEL_WIDTH, fits);
+        MTRClientConfig.setTimelinePanelWidth(panelWidthOverride);
+        panelWidth = computePanelWidth();
+
+        cachedView = null;
+        cachedStep = -1;
+        cachedPanelWidth = -1;
+        cachedRightFontScale = -1.0F;
+        measuredContentWidth = 0;
+
+        clampScroll();
+        clampDetailScroll();
+        clampSummaryScroll();
     }
 
     @Override
     protected void init() {
+        // Minecraft rebuilds a screen's widgets when returning from another screen
+        // (for example FilterScreen). Clear our tracking before recreating them, or
+        // settings widgets remain in the old Screen list and cannot be rendered/input.
+        mainWidgets.clear();
+        settingsWidgets.clear();
+        sidebarWidthSlider = null;
+        sidebarWidthInput = null;
+        leftFontSlider = null;
+        leftFontInput = null;
+        rightFontSlider = null;
+        rightFontInput = null;
+        settingsModeButton = null;
+        settingsDoneButton = null;
+
         panelWidth = computePanelWidth();
         rebuildVisible();
         lastRevision = ClientReplayState.timelineRevision();
@@ -167,39 +235,47 @@ public class TimelineScreen extends Screen {
             x += addToolButton(Component.literal("L" + level), x, y, 26, () -> collapseToLevel(target));
         }
 
-        followButton = Button.builder(followLabel(), button -> {
+        followButton = addMainWidget(Button.builder(followLabel(), button -> {
             MTRClientConfig.setFollowCursor(!MTRClientConfig.followCursor());
             button.setMessage(followLabel());
-        }).bounds(x, y, 92, 16).build();
-        addRenderableWidget(followButton);
+        }).bounds(x, y, 92, 16).build());
 
-        Button cameraFollowButton = Button.builder(cameraFollow(), button -> {
+        Button cameraFollowButton = addMainWidget(Button.builder(cameraFollow(), button -> {
             MTRClientNetworking.setCameraFollow(!ClientReplayState.cameraFollow());
             button.setMessage(cameraFollow());
-        }).bounds(followButton.getWidth() + x + 4, y, 92, 16).build();
-        addRenderableWidget(cameraFollowButton);
+        }).bounds(followButton.getWidth() + x + 4, y, 92, 16).build());
 
-        Button markersButton = Button.builder(markerLabel(), button -> {
+        Button markersButton = addMainWidget(Button.builder(markerLabel(), button -> {
             MTRClientConfig.setHideMarkers(!MTRClientConfig.hideMarkers());
             button.setMessage(markerLabel());
-        }).bounds(cameraFollowButton.getX() + cameraFollowButton.getWidth() + 4, y, 92, 16).build();
-        addRenderableWidget(markersButton);
+        }).bounds(cameraFollowButton.getX() + cameraFollowButton.getWidth() + 4, y, 92, 16).build());
 
-        addRenderableWidget(Button.builder(
-                MTRComponent.translatable("mtr.timeline.help", "Manual"),
-                button -> helpOpen = !helpOpen)
-                .bounds(markersButton.getX() + markersButton.getWidth() + 4, y, 60, 16)
-                .build());
+        Button helpButton = addMainWidget(Button.builder(
+            MTRComponent.translatable("mtr.timeline.help", "Manual"),
+            button -> toggleHelp())
+            .bounds(markersButton.getX() + markersButton.getWidth() + 4, y, 60, 16)
+            .build());
+
+        Button settingsButton = addMainWidget(new IconButton(helpButton.getX() + helpButton.getWidth() + 4
+                , y, 16, 16,
+                MTRComponent.translatable("mtr.timeline.setting", "Setting"),
+                button -> toggleSettings(),
+                MicroTimingReplay.id("textures/gui/settings.png"),
+                2, 2, ARGB.white(100)));
+
+        initSettingsWidgets();
 
         int bottom = this.height - 24;
-        addRenderableWidget(Button.builder(MTRComponent.translatable("mtr.timeline.backward", "◀ Back"),
+        addMainWidget(Button.builder(MTRComponent.translatable("mtr.timeline.backward", "◀ Back"),
                 b -> MTRClientNetworking.step(false)).bounds(8, bottom, 70, 18).build());
-        addRenderableWidget(Button.builder(MTRComponent.translatable("mtr.timeline.forward", "Forward ▶"),
+        addMainWidget(Button.builder(MTRComponent.translatable("mtr.timeline.forward", "Forward ▶"),
                 b -> MTRClientNetworking.step(true)).bounds(82, bottom, 70, 18).build());
-        addRenderableWidget(Button.builder(MTRComponent.translatable("mtr.timeline.filter", "Filter"),
+        addMainWidget(Button.builder(MTRComponent.translatable("mtr.timeline.filter", "Filter"),
                 b -> this.minecraft.gui.setScreen(new FilterScreen(this))).bounds(this.width - 154, bottom, 70, 18).build());
-        addRenderableWidget(Button.builder(MTRComponent.translatable("mtr.timeline.close", "Close"),
+        addMainWidget(Button.builder(MTRComponent.translatable("mtr.timeline.close", "Close"),
                 b -> onClose()).bounds(this.width - 80, bottom, 70, 18).build());
+
+        updateSettingsWidgetVisibility();
 
         if (MTRClientConfig.followCursor()) {
             scrollTo(ClientReplayState.cursorRow());
@@ -214,8 +290,392 @@ public class TimelineScreen extends Screen {
     }
 
     private int addToolButton(Component label, int x, int y, int width, Runnable action) {
-        addRenderableWidget(Button.builder(label, b -> action.run()).bounds(x, y, width, 16).build());
+        addMainWidget(Button.builder(label, b -> action.run()).bounds(x, y, width, 16).build());
         return width + 4;
+    }
+
+    private <T extends AbstractWidget> T addMainWidget(T widget) {
+        mainWidgets.add(widget);
+        return addRenderableWidget(widget);
+    }
+
+    private <T extends AbstractWidget> T addSettingsWidget(T widget) {
+        settingsWidgets.add(widget);
+        return addRenderableWidget(widget);
+    }
+
+    private void initSettingsWidgets() {
+        if (sidebarWidthSlider != null) return;
+
+        sidebarWidthSlider = addSettingsWidget(new SidebarWidthSlider(
+                0, 0, 240, 20, sidebarWidthLabel(), settingsCurrentWidth()));
+        sidebarWidthInput = addSettingsWidget(new EditBox(
+                this.font, 0, 0, 240, 20,
+                MTRComponent.translatable("mtr.timeline.settings.sidebar_width", "侧边栏宽度")));
+        sidebarWidthInput.setMaxLength(4);
+        sidebarWidthInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.sidebar_width_hint", "100 - %d", settingsMaxWidth()));
+        sidebarWidthInput.setResponder(this::onSidebarWidthInputChanged);
+
+        leftFontSlider = addSettingsWidget(new LeftFontSlider(
+                0, 0, 240, 20, leftFontLabel(), leftFontPercent()));
+        leftFontInput = addSettingsWidget(new EditBox(
+                this.font, 0, 0, 240, 20,
+                MTRComponent.translatable("mtr.timeline.settings.left_font_size", "左侧字体大小")));
+        leftFontInput.setMaxLength(3);
+        leftFontInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.left_font_size_hint", "输入 %d - %d%%",
+                FONT_MIN_PERCENT, FONT_MAX_PERCENT));
+        leftFontInput.setResponder(this::onLeftFontInputChanged);
+
+        rightFontSlider = addSettingsWidget(new RightFontSlider(
+                0, 0, 240, 20, rightFontLabel(), rightFontPercent()));
+        rightFontInput = addSettingsWidget(new EditBox(
+                this.font, 0, 0, 240, 20,
+                MTRComponent.translatable("mtr.timeline.settings.right_font_size", "右侧字体大小")));
+        rightFontInput.setMaxLength(3);
+        rightFontInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.right_font_size_hint", "输入 %d - %d%%",
+                FONT_MIN_PERCENT, FONT_MAX_PERCENT));
+        rightFontInput.setResponder(this::onRightFontInputChanged);
+
+        settingsModeButton = addSettingsWidget(Button.builder(settingsModeLabel(), button -> {
+            settingsInputMode = !settingsInputMode;
+            updateSettingsWidgetVisibility();
+            if (settingsInputMode) {
+                sidebarWidthInput.setValue(Integer.toString(settingsCurrentWidth()));
+                leftFontInput.setValue(Integer.toString(leftFontPercent()));
+                rightFontInput.setValue(Integer.toString(rightFontPercent()));
+                setFocused(sidebarWidthInput);
+                sidebarWidthInput.setFocused(true);
+            } else {
+                setFocused(sidebarWidthSlider);
+                sidebarWidthSlider.setFocused(true);
+            }
+        }).bounds(0, 0, 112, 20).build());
+
+        settingsDoneButton = addSettingsWidget(Button.builder(
+                MTRComponent.translatable("mtr.timeline.settings.done", "完成"),
+                button -> setSettingsOpen(false))
+                .bounds(0, 0, 80, 20)
+                .build());
+
+        updateSettingsWidgetVisibility();
+    }
+
+    private void toggleHelp() {
+        helpOpen = !helpOpen;
+        if (helpOpen) setSettingsOpen(false);
+    }
+
+    private void toggleSettings() {
+        setSettingsOpen(!settingsOpen);
+    }
+
+    private void setSettingsOpen(boolean open) {
+        settingsOpen = open;
+        if (open) {
+            helpOpen = false;
+            closeSearch();
+            setFocused(null);
+            if (sidebarWidthInput != null) {
+                sidebarWidthInput.setValue(Integer.toString(settingsCurrentWidth()));
+            }
+            if (sidebarWidthSlider != null) {
+                sidebarWidthSlider.setWidthValueSilently(settingsCurrentWidth());
+            }
+            if (leftFontInput != null) {
+                leftFontInput.setValue(Integer.toString(leftFontPercent()));
+            }
+            if (leftFontSlider != null) {
+                leftFontSlider.setPercentValueSilently(leftFontPercent());
+            }
+            if (rightFontInput != null) {
+                rightFontInput.setValue(Integer.toString(rightFontPercent()));
+            }
+            if (rightFontSlider != null) {
+                rightFontSlider.setPercentValueSilently(rightFontPercent());
+            }
+        } else {
+            setFocused(null);
+        }
+        updateSettingsWidgetVisibility();
+    }
+
+    private void updateSettingsWidgetVisibility() {
+        for (AbstractWidget widget : mainWidgets) {
+            widget.visible = !settingsOpen;
+        }
+        for (AbstractWidget widget : settingsWidgets) {
+            widget.visible = settingsOpen;
+        }
+        if (sidebarWidthSlider != null) sidebarWidthSlider.visible = settingsOpen && !settingsInputMode;
+        if (sidebarWidthInput != null) sidebarWidthInput.visible = settingsOpen && settingsInputMode;
+        if (leftFontSlider != null) leftFontSlider.visible = settingsOpen && !settingsInputMode;
+        if (leftFontInput != null) leftFontInput.visible = settingsOpen && settingsInputMode;
+        if (rightFontSlider != null) rightFontSlider.visible = settingsOpen && !settingsInputMode;
+        if (rightFontInput != null) rightFontInput.visible = settingsOpen && settingsInputMode;
+    }
+
+    private int settingsMaxWidth() {
+        return Math.max(MIN_PANEL_WIDTH,
+                (this.width - LIST_X - EDGE_PAD - MIN_MIDDLE_GAP) / 2);
+    }
+
+    private int settingsCurrentWidth() {
+        return Math.clamp(panelWidth, MIN_PANEL_WIDTH, settingsMaxWidth());
+    }
+
+    private Component sidebarWidthLabel() {
+        return MTRComponent.translatable(
+                "mtr.timeline.settings.sidebar_width_value", "侧边栏宽度: %d", settingsCurrentWidth());
+    }
+
+    private int leftFontPercent() {
+        return Math.round(leftFontScale * 100.0F);
+    }
+
+    private Component leftFontLabel() {
+        return MTRComponent.translatable(
+                "mtr.timeline.settings.left_font_size_value", "左侧字体大小: %d%%", leftFontPercent());
+    }
+
+    private int rightFontPercent() {
+        return Math.round(rightFontScale * 100.0F);
+    }
+
+    private Component rightFontLabel() {
+        return MTRComponent.translatable(
+                "mtr.timeline.settings.right_font_size_value", "右侧字体大小: %d%%", rightFontPercent());
+    }
+
+    private int leftTextWidth(Component text) {
+        return Math.round(this.font.width(text) * leftFontScale);
+    }
+
+    private int leftRowHeight() {
+        return MTRWidgets.scaledLineHeight(this.font, leftFontScale);
+    }
+
+    private int leftFoldGap() {
+        return Math.max(1, Math.round(4.0F * leftFontScale));
+    }
+
+    /** Width reserved between a row's indentation origin and its label. */
+    private int leftFoldSlotWidth() {
+        int symbolWidth = Math.max(
+                leftTextWidth(Component.literal("[-]")),
+                leftTextWidth(Component.literal("[+]"))
+        );
+        return Math.max(
+                Math.max(2, symbolWidth + leftFoldGap()),
+                Math.round(20.0F * leftFontScale)
+        );
+    }
+
+    private Component foldSymbol(int rowIndex) {
+        return Component.literal(collapsed.contains(rowIndex) ? "[+]" : "[-]");
+    }
+
+    private int rightTextWidth(FormattedCharSequence text) {
+        return Math.round(this.font.width(text) * rightFontScale);
+    }
+
+    private int rightRowHeight() {
+        return MTRWidgets.scaledLineHeight(this.font, rightFontScale);
+    }
+
+    private Component settingsModeLabel() {
+        return MTRComponent.translatable(
+                settingsInputMode
+                        ? "mtr.timeline.settings.use_slider"
+                        : "mtr.timeline.settings.use_input",
+                settingsInputMode ? "切换为滑块" : "切换为输入框");
+    }
+
+    private void onSidebarWidthInputChanged(String text) {
+        if (text.isBlank()) return;
+        try {
+            int width = Integer.parseInt(text);
+            if (width >= MIN_PANEL_WIDTH && width <= settingsMaxWidth()) {
+                setSidebarWidthFromInput(width);
+            }
+        } catch (NumberFormatException ignored) {
+            // Keep the text field editable while the user is entering a number.
+        }
+    }
+
+    private void setSidebarWidthFromInput(int width) {
+        setPanelWidthOverride(width);
+        if (sidebarWidthSlider != null) sidebarWidthSlider.setWidthValue(panelWidth);
+    }
+
+    private void onLeftFontInputChanged(String text) {
+        if (text.isBlank()) return;
+        try {
+            int percent = Integer.parseInt(text);
+            if (percent >= FONT_MIN_PERCENT && percent <= FONT_MAX_PERCENT) {
+                setLeftFontScale(percent);
+                if (leftFontSlider != null) leftFontSlider.setPercentValue(percent);
+            }
+        } catch (NumberFormatException ignored) {
+            // Keep the text field editable while the user is entering a number.
+        }
+    }
+
+    private void setLeftFontScale(int percent) {
+        int normalized = Math.clamp(percent, FONT_MIN_PERCENT, FONT_MAX_PERCENT);
+        leftFontScale = normalized / 100.0F;
+        MTRClientConfig.setTimelineLeftFontPercent(normalized);
+        clampScroll();
+    }
+
+    private void onRightFontInputChanged(String text) {
+        if (text.isBlank()) return;
+        try {
+            int percent = Integer.parseInt(text);
+            if (percent >= FONT_MIN_PERCENT && percent <= FONT_MAX_PERCENT) {
+                setRightFontScale(percent);
+                if (rightFontSlider != null) rightFontSlider.setPercentValue(percent);
+            }
+        } catch (NumberFormatException ignored) {
+            // Keep the text field editable while the user is entering a number.
+        }
+    }
+
+    private void setRightFontScale(int percent) {
+        int normalized = Math.clamp(percent, FONT_MIN_PERCENT, FONT_MAX_PERCENT);
+        rightFontScale = normalized / 100.0F;
+        MTRClientConfig.setTimelineRightFontPercent(normalized);
+        cachedView = null;
+        cachedStep = -1;
+        cachedPanelWidth = -1;
+        cachedRightFontScale = -1.0F;
+        clampDetailScroll();
+        clampSummaryScroll();
+    }
+
+    private final class SidebarWidthSlider extends AbstractSliderButton {
+        private SidebarWidthSlider(int x, int y, int width, int height, Component message, int initialWidth) {
+            super(x, y, width, height, message, 0.0);
+            this.value = normalizedWidth(initialWidth);
+            updateMessage();
+        }
+
+        private double normalizedWidth(int width) {
+            int max = settingsMaxWidth();
+            return max <= MIN_PANEL_WIDTH
+                    ? 0.0
+                    : (double) (Math.clamp(width, MIN_PANEL_WIDTH, max) - MIN_PANEL_WIDTH)
+                    / (double) (max - MIN_PANEL_WIDTH);
+        }
+
+        private int widthValue() {
+            int max = settingsMaxWidth();
+            return MIN_PANEL_WIDTH + (int) Math.round(value * Math.max(0, max - MIN_PANEL_WIDTH));
+        }
+
+        private void setWidthValue(int width) {
+            setValue(normalizedWidth(width));
+        }
+
+        private void setWidthValueSilently(int width) {
+            this.value = normalizedWidth(width);
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(sidebarWidthLabel());
+        }
+
+        @Override
+        protected void applyValue() {
+            setPanelWidthOverride(widthValue());
+            if (sidebarWidthInput != null && !sidebarWidthInput.getValue().equals(Integer.toString(panelWidth))) {
+                sidebarWidthInput.setValue(Integer.toString(panelWidth));
+            }
+        }
+    }
+
+    private final class LeftFontSlider extends AbstractSliderButton {
+        private LeftFontSlider(int x, int y, int width, int height, Component message, int initialPercent) {
+            super(x, y, width, height, message, 0.0);
+            this.value = normalizedPercent(initialPercent);
+            updateMessage();
+        }
+
+        private double normalizedPercent(int percent) {
+            return (double) (Math.clamp(percent, FONT_MIN_PERCENT, FONT_MAX_PERCENT)
+                    - FONT_MIN_PERCENT)
+                    / (double) (FONT_MAX_PERCENT - FONT_MIN_PERCENT);
+        }
+
+        private int percentValue() {
+            return FONT_MIN_PERCENT
+                    + (int) Math.round(value * (FONT_MAX_PERCENT - FONT_MIN_PERCENT));
+        }
+
+        private void setPercentValue(int percent) {
+            setValue(normalizedPercent(percent));
+        }
+
+        private void setPercentValueSilently(int percent) {
+            this.value = normalizedPercent(percent);
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(leftFontLabel());
+        }
+
+        @Override
+        protected void applyValue() {
+            setLeftFontScale(percentValue());
+            if (leftFontInput != null && !leftFontInput.getValue().equals(Integer.toString(percentValue()))) {
+                leftFontInput.setValue(Integer.toString(percentValue()));
+            }
+        }
+    }
+
+    private final class RightFontSlider extends AbstractSliderButton {
+        private RightFontSlider(int x, int y, int width, int height, Component message, int initialPercent) {
+            super(x, y, width, height, message, 0.0);
+            this.value = normalizedPercent(initialPercent);
+            updateMessage();
+        }
+
+        private double normalizedPercent(int percent) {
+            return (double) (Math.clamp(percent, FONT_MIN_PERCENT, FONT_MAX_PERCENT) - FONT_MIN_PERCENT)
+                    / (double) (FONT_MAX_PERCENT - FONT_MIN_PERCENT);
+        }
+
+        private int percentValue() {
+            return FONT_MIN_PERCENT + (int) Math.round(value * (FONT_MAX_PERCENT - FONT_MIN_PERCENT));
+        }
+
+        private void setPercentValue(int percent) {
+            setValue(normalizedPercent(percent));
+        }
+
+        private void setPercentValueSilently(int percent) {
+            this.value = normalizedPercent(percent);
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(rightFontLabel());
+        }
+
+        @Override
+        protected void applyValue() {
+            setRightFontScale(percentValue());
+            if (rightFontInput != null && !rightFontInput.getValue().equals(Integer.toString(percentValue()))) {
+                rightFontInput.setValue(Integer.toString(percentValue()));
+            }
+        }
     }
 
     private Component followLabel() {
@@ -282,14 +742,14 @@ public class TimelineScreen extends Screen {
         return labelRight() - hTrackLeft();
     }
 
-    // The detail column mirrors the list: same chrome, same row metrics, same scrollbar.
+    // The detail column mirrors the list chrome, but keeps an independently scaled font metric.
 
     private int detailContentRight() {
         return detailX() + panelWidth - V_SCROLLBAR - 2;
     }
 
     private int detailSummaryTop() {
-        return LIST_TOP + ROW_HEIGHT + 2;
+        return LIST_TOP + rightRowHeight() + 2;
     }
 
     private int detailSummaryLines() {
@@ -298,12 +758,13 @@ public class TimelineScreen extends Screen {
 
     /** What the summary would take if nothing limited it, less the header and gaps. */
     private int detailSummaryMaxHeight() {
-        int available = detailBodyBottom() - detailSummaryTop() - ROW_HEIGHT - 6;
-        return Math.max(ROW_HEIGHT, (int) (available * SUMMARY_MAX_SHARE));
+        int rowHeight = rightRowHeight();
+        int available = detailBodyBottom() - detailSummaryTop() - rowHeight - 6;
+        return Math.max(rowHeight, (int) (available * SUMMARY_MAX_SHARE));
     }
 
     private int detailSummaryHeight() {
-        return Math.min(detailSummaryLines() * ROW_HEIGHT, detailSummaryMaxHeight());
+        return Math.min(detailSummaryLines() * rightRowHeight(), detailSummaryMaxHeight());
     }
 
     private int detailSummaryBottom() {
@@ -311,7 +772,7 @@ public class TimelineScreen extends Screen {
     }
 
     private int detailSummaryRowCount() {
-        return Math.max(1, detailSummaryHeight() / ROW_HEIGHT);
+        return Math.max(1, detailSummaryHeight() / rightRowHeight());
     }
 
     /** The pinned call-stack header, sitting under whatever the summary was allowed. */
@@ -321,7 +782,7 @@ public class TimelineScreen extends Screen {
 
     /** First row of the scrolling body, which holds the call stack and nothing else. */
     private int detailBodyTop() {
-        return detailHeaderY() + ROW_HEIGHT + 2;
+        return detailHeaderY() + rightRowHeight() + 2;
     }
 
     /** Mirrors {@link #rowsBottom()}: the horizontal bar's strip is always reserved. */
@@ -330,7 +791,7 @@ public class TimelineScreen extends Screen {
     }
 
     private int detailBodyRowCount() {
-        return Math.max(1, (detailBodyBottom() - detailBodyTop()) / ROW_HEIGHT);
+        return Math.max(1, (detailBodyBottom() - detailBodyTop()) / rightRowHeight());
     }
 
     private int detailContentLeft() {
@@ -398,15 +859,56 @@ public class TimelineScreen extends Screen {
         }
 
         visible = result;
+        timelineContentSlots = 0;
+        long previousTick = Long.MIN_VALUE;
+        for (int rowIndex : visible) {
+            MTRPayloads.TimelineRow row = rows.get(rowIndex);
+            if (row.tick() != previousTick) {
+                timelineContentSlots++;
+                previousTick = row.tick();
+            }
+            timelineContentSlots++;
+        }
         clampScroll();
     }
 
     private int visibleRowCount() {
-        return Math.max(1, (rowsBottom() - LIST_TOP) / ROW_HEIGHT);
+        return Math.max(1, (rowsBottom() - LIST_TOP) / leftRowHeight());
+    }
+
+    /**
+     * The largest event-row offset that still leaves the final event fully visible.
+     * Tick separators consume a row too, so {@code visible.size() - visibleRowCount()}
+     * is only an estimate and can cut off the bottom of a long timeline.
+     */
+    private int maxTimelineScroll() {
+        if (visible.isEmpty()) return 0;
+
+        int slotsOnScreen = visibleRowCount();
+        List<MTRPayloads.TimelineRow> rows = rows();
+        int start = visible.size() - 1;
+        MTRPayloads.TimelineRow last = rows.get(visible.get(start));
+        int used = 1;
+        if (start == 0 || last.tick() != rows.get(visible.get(start - 1)).tick()) {
+            used++;
+        }
+
+        while (start > 0) {
+            int candidate = start - 1;
+            MTRPayloads.TimelineRow row = rows.get(visible.get(candidate));
+            int cost = 1;
+            if (candidate == 0 || row.tick() != rows.get(visible.get(candidate - 1)).tick()) {
+                cost++;
+            }
+            if (used + cost > slotsOnScreen) break;
+            used += cost;
+            start = candidate;
+        }
+        return start;
     }
 
     private void clampScroll() {
-        scroll = Math.clamp(scroll, 0, Math.max(0, visible.size() - visibleRowCount()));
+        scroll = Math.clamp(scroll, 0, maxTimelineScroll());
         hScroll = Math.clamp(hScroll, 0, maxHScroll());
     }
 
@@ -525,9 +1027,9 @@ public class TimelineScreen extends Screen {
                 MTRWidgets.PANEL_BG, MTRWidgets.PANEL_BORDER);
 
         if (rows().isEmpty()) {
-            graphics.text(this.font,
+            MTRWidgets.scaledText(graphics,
                     MTRComponent.translatable("mtr.timeline.empty", "No timeline — watch a running replay first"),
-                    LIST_X + 8, LIST_TOP + 6, MTRWidgets.TEXT_DIM);
+                    LIST_X + 8, LIST_TOP + 6, MTRWidgets.TEXT_DIM, this.font, leftFontScale);
         } else {
             graphics.enableScissor(LIST_X + 1, LIST_TOP, contentRight(), rowsBottom());
             drawRows(graphics, mouseX, mouseY, rowsBottom());
@@ -538,6 +1040,10 @@ public class TimelineScreen extends Screen {
 
         drawDetails(graphics, mouseX, mouseY);
 
+        if (settingsOpen) {
+            drawSettings(graphics);
+        }
+
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         if (helpOpen) {
@@ -546,9 +1052,10 @@ public class TimelineScreen extends Screen {
 
         if (searching()) {
             Component status = searchStatus();
-            graphics.text(this.font, status,
-                    searchBox.getX() - 6 - this.font.width(status), searchBox.getY() + 3,
-                    matches.isEmpty() ? MTRWidgets.TEXT_OFF : MTRWidgets.TEXT_ACCENT);
+            MTRWidgets.scaledText(graphics, status,
+                    searchBox.getX() - 6 - leftTextWidth(status), searchBox.getY() + 3,
+                    matches.isEmpty() ? MTRWidgets.TEXT_OFF : MTRWidgets.TEXT_ACCENT,
+                    this.font, leftFontScale);
         }
     }
 
@@ -564,54 +1071,59 @@ public class TimelineScreen extends Screen {
         }
 
         int widest = 0;
+        int rowHeight = leftRowHeight();
         int y = LIST_TOP;
         for (int i = scroll; i < visible.size() && y < listBottom; i++) {
             int rowIndex = visible.get(i);
             MTRPayloads.TimelineRow row = rows.get(rowIndex);
 
             if (row.tick() != previousTick) {
-                if (y + ROW_HEIGHT > listBottom) break;
-                graphics.text(this.font,
+                if (y + rowHeight > listBottom) break;
+                MTRWidgets.scaledText(graphics,
                         MTRComponent.translatable("mtr.timeline.tick_marker", "── Tick %d ──", row.tick()),
-                        labelLeft(), y + 1, MTRWidgets.TEXT_DIM);
+                        labelLeft(), y + 1, MTRWidgets.TEXT_DIM, this.font, leftFontScale);
                 previousTick = row.tick();
-                y += ROW_HEIGHT;
+                y += rowHeight;
                 if (y >= listBottom) break;
             }
 
-            boolean hovered = MTRWidgets.isOver(mouseX, mouseY, LIST_X + 1, y, contentRight - LIST_X, ROW_HEIGHT);
+            boolean hovered = MTRWidgets.isOver(mouseX, mouseY, LIST_X + 1, y, contentRight - LIST_X, rowHeight);
             if (matchSet.contains(rowIndex)) {
                 boolean current = matchCursor >= 0 && matchCursor < matches.size()
                         && matches.get(matchCursor) == rowIndex;
-                graphics.fill(LIST_X + 1, y, contentRight, y + ROW_HEIGHT,
+                graphics.fill(LIST_X + 1, y, contentRight, y + rowHeight,
                         current ? SEARCH_CURRENT_BG : SEARCH_MATCH_BG);
             }
             if (row.step() == selectedStep) {
-                graphics.fill(LIST_X + 1, y, contentRight, y + ROW_HEIGHT, MTRWidgets.CARD_BG_ACTIVE);
+                graphics.fill(LIST_X + 1, y, contentRight, y + rowHeight, MTRWidgets.CARD_BG_ACTIVE);
             }
             if (rowIndex == cursorRow) {
-                graphics.fill(LIST_X + 1, y, contentRight, y + ROW_HEIGHT, MTRWidgets.CURSOR_ROW_BG);
+                graphics.fill(LIST_X + 1, y, contentRight, y + rowHeight, MTRWidgets.CURSOR_ROW_BG);
             } else if (hovered) {
-                graphics.fill(LIST_X + 1, y, contentRight, y + ROW_HEIGHT, 0x30FFFFFF);
+                graphics.fill(LIST_X + 1, y, contentRight, y + rowHeight, 0x30FFFFFF);
             }
 
-            int contentWidth = rowIndent(row) + 20 + this.font.width(row.label());
+            int foldSlotWidth = leftFoldSlotWidth();
+            int contentWidth = rowIndent(row) + foldSlotWidth + leftTextWidth(row.label());
             if (contentWidth > widest) widest = contentWidth;
 
-            graphics.enableScissor(LIST_X + 1, y, labelRight, y + ROW_HEIGHT);
+            graphics.enableScissor(LIST_X + 1, y, labelRight, y + rowHeight);
             int x = labelLeft() + rowIndent(row) - hScroll;
             if (hasChildren(rowIndex)) {
-                graphics.text(this.font, Component.literal(collapsed.contains(rowIndex) ? "[+]" : "[-]"),
-                        x, y + 1, MTRWidgets.TEXT_ACCENT);
+                MTRWidgets.scaledText(graphics,
+                        foldSymbol(rowIndex),
+                        x, y + 1, MTRWidgets.TEXT_ACCENT, this.font, leftFontScale);
             }
-            graphics.text(this.font, row.label(), x + 20, y + 1, MTRWidgets.opaque(row.color()));
+            MTRWidgets.scaledText(graphics, row.label(), x + foldSlotWidth, y + 1,
+                    MTRWidgets.opaque(row.color()), this.font, leftFontScale);
             graphics.disableScissor();
 
             Component jump = Component.literal("#" + row.step() + "↗");
-            graphics.text(this.font, jump, contentRight - 2 - this.font.width(jump), y + 1,
-                    row.step() == selectedStep ? MTRWidgets.TEXT_ACCENT : MTRWidgets.TEXT_DIM);
+            MTRWidgets.scaledText(graphics, jump, contentRight - 2 - leftTextWidth(jump), y + 1,
+                    row.step() == selectedStep ? MTRWidgets.TEXT_ACCENT : MTRWidgets.TEXT_DIM,
+                    this.font, leftFontScale);
 
-            y += ROW_HEIGHT;
+            y += rowHeight;
         }
 
         measuredContentWidth = widest;
@@ -619,19 +1131,21 @@ public class TimelineScreen extends Screen {
     }
 
     private int rowIndent(MTRPayloads.TimelineRow row) {
-        return row.depth() * INDENT;
+        if (row.depth() <= 0) return 0;
+        return Math.max(1, Math.round(row.depth() * INDENT * leftFontScale));
     }
 
     private void drawScrollbars(GuiGraphicsExtractor graphics) {
         int rowsOnScreen = visibleRowCount();
         int right = listRight();
         int rowsBottom = rowsBottom();
+        int maxScroll = maxTimelineScroll();
 
-        if (visible.size() > rowsOnScreen) {
+        if (maxScroll > 0) {
             int trackHeight = rowsBottom - LIST_TOP;
-            int thumbHeight = verticalThumbHeight(trackHeight, rowsOnScreen, visible.size());
+            int thumbHeight = verticalThumbHeight(trackHeight, rowsOnScreen, timelineContentSlots);
             int travel = trackHeight - thumbHeight;
-            int thumbY = LIST_TOP + (travel * scroll / Math.max(1, visible.size() - rowsOnScreen));
+            int thumbY = LIST_TOP + (travel * scroll / Math.max(1, maxScroll));
 
             graphics.fill(right - V_SCROLLBAR, LIST_TOP, right - 2, rowsBottom, MTRWidgets.SCROLL_TRACK);
             graphics.fill(right - V_SCROLLBAR, thumbY, right - 2, thumbY + thumbHeight,
@@ -675,13 +1189,15 @@ public class TimelineScreen extends Screen {
     private int cachedStep = -1;
     /** Column width the cached lines were trimmed to; a resize or scale change invalidates them. */
     private int cachedPanelWidth = -1;
+    private float cachedRightFontScale = -1.0F;
 
     private DetailView detailView(MTRPayloads.DetailsS2C details) {
-        if (cachedView != null && cachedStep == selectedStep && cachedPanelWidth == panelWidth) {
+        if (cachedView != null && cachedStep == selectedStep && cachedPanelWidth == panelWidth
+                && cachedRightFontScale == rightFontScale) {
             return cachedView;
         }
 
-        int inner = panelWidth - V_SCROLLBAR - 12;
+        int inner = Math.max(1, Math.round((panelWidth - V_SCROLLBAR - 12) / rightFontScale));
 
         List<DetailLine> summary = new ArrayList<>();
         for (FormattedCharSequence line : this.font.split(details.hover(), inner)) {
@@ -696,7 +1212,7 @@ public class TimelineScreen extends Screen {
         for (String raw : details.stackTrace()) {
             DetailLine line = new DetailLine(formatStackTraceLine(raw).getVisualOrderText(), MTRWidgets.TEXT_DIM);
             trace.add(line);
-            contentWidth = Math.max(contentWidth, this.font.width(line.text()));
+            contentWidth = Math.max(contentWidth, rightTextWidth(line.text()));
         }
 
         MutableComponent tooltip = MTRComponent.translatable(
@@ -719,6 +1235,7 @@ public class TimelineScreen extends Screen {
                 String.join("\n", details.stackTrace()));
         cachedStep = selectedStep;
         cachedPanelWidth = panelWidth;
+        cachedRightFontScale = rightFontScale;
         return cachedView;
     }
 
@@ -731,19 +1248,22 @@ public class TimelineScreen extends Screen {
         stackHeaderRect = ScreenRectangle.empty();
 
         if (selectedStep < 0) {
-            graphics.text(this.font,
+            MTRWidgets.scaledText(graphics,
                     MTRComponent.translatable("mtr.timeline.no_selection", "Select a row to inspect it"),
-                    x + 6, LIST_TOP + 1, MTRWidgets.TEXT_DIM);
+                    x + 6, LIST_TOP + 1, MTRWidgets.TEXT_DIM, this.font, rightFontScale);
             return;
         }
 
-        graphics.text(this.font, MTRComponent.translatable("mtr.timeline.details", "Step #%d", selectedStep),
-                x + 6, LIST_TOP + 1, MTRWidgets.TEXT_ACCENT);
+        MTRWidgets.scaledText(graphics,
+                MTRComponent.translatable("mtr.timeline.details", "Step #%d", selectedStep),
+                x + 6, LIST_TOP + 1, MTRWidgets.TEXT_ACCENT, this.font, rightFontScale);
 
         MTRPayloads.DetailsS2C details = ClientReplayState.details(selectedStep);
         if (details == null) {
-            graphics.text(this.font, MTRComponent.translatable("mtr.timeline.loading", "Loading…"),
-                    x + 6, LIST_TOP + ROW_HEIGHT + 1, MTRWidgets.TEXT_DIM);
+            MTRWidgets.scaledText(graphics,
+                    MTRComponent.translatable("mtr.timeline.loading", "Loading…"),
+                    x + 6, LIST_TOP + rightRowHeight() + 1, MTRWidgets.TEXT_DIM,
+                    this.font, rightFontScale);
             return;
         }
 
@@ -758,8 +1278,9 @@ public class TimelineScreen extends Screen {
         int summaryY = summaryTop;
         for (int i = summaryScroll; i < view.summary().size() && summaryY < summaryBottom; i++) {
             DetailLine line = view.summary().get(i);
-            graphics.text(this.font, line.text(), x + 6, summaryY + 1, line.color());
-            summaryY += ROW_HEIGHT;
+            MTRWidgets.scaledText(graphics, line.text(), x + 6, summaryY + 1,
+                    line.color(), this.font, rightFontScale);
+            summaryY += rightRowHeight();
         }
         graphics.disableScissor();
         drawSummaryScrollbar(graphics, view.summary().size(), summaryTop, summaryBottom);
@@ -768,7 +1289,7 @@ public class TimelineScreen extends Screen {
         Component header = copiedRecently()
                 ? MTRComponent.translatable("mtr.timeline.stacktrace_copied", "Call stack — copied!")
                 : MTRComponent.translatable("mtr.timeline.stacktrace", "Call stack ⧉");
-        stackHeaderRect = new ScreenRectangle(x + 6, headerY - 1, panelWidth - 12, this.font.lineHeight + 2);
+        stackHeaderRect = new ScreenRectangle(x + 6, headerY - 1, panelWidth - 12, rightRowHeight() + 2);
 
         boolean headerHovered = MTRWidgets.isOver(mouseX, mouseY,
                 stackHeaderRect.left(), stackHeaderRect.top(), stackHeaderRect.width(), stackHeaderRect.height());
@@ -777,20 +1298,22 @@ public class TimelineScreen extends Screen {
                     stackHeaderRect.left() + stackHeaderRect.width(),
                     stackHeaderRect.top() + stackHeaderRect.height(), 0x30FFFFFF);
         }
-        graphics.text(this.font, header, x + 6, headerY,
-                copiedRecently() ? MTRWidgets.TEXT_ON : MTRWidgets.TEXT_ACCENT);
+        MTRWidgets.scaledText(graphics, header, x + 6, headerY,
+                copiedRecently() ? MTRWidgets.TEXT_ON : MTRWidgets.TEXT_ACCENT,
+                this.font, rightFontScale);
 
         clampDetailScroll();
 
-        // Same row metrics and clipping as the timeline list, so the two columns match.
+        // The detail column uses its own scaled row metrics and clipping.
         int bodyTop = detailBodyTop();
         int bodyBottom = detailBodyBottom();
         graphics.enableScissor(x + 1, bodyTop, detailContentRight(), bodyBottom);
         int lineY = bodyTop;
         for (int i = detailScroll; i < view.trace().size() && lineY < bodyBottom; i++) {
             DetailLine line = view.trace().get(i);
-            graphics.text(this.font, line.text(), detailContentLeft() - detailHScroll, lineY + 1, line.color());
-            lineY += ROW_HEIGHT;
+            MTRWidgets.scaledText(graphics, line.text(), detailContentLeft() - detailHScroll, lineY + 1,
+                    line.color(), this.font, rightFontScale);
+            lineY += rightRowHeight();
         }
         graphics.disableScissor();
 
@@ -887,6 +1410,14 @@ public class TimelineScreen extends Screen {
             return true;
         }
 
+        if (settingsOpen) {
+            if (event.isEscape()) {
+                setSettingsOpen(false);
+                return true;
+            }
+            return super.keyPressed(event);
+        }
+
         if (ClientReplayState.cameraFollow() && !searching() && matchesHideGui(event)) {
             if (!this.minecraft.gui.hud.isHidden()) this.minecraft.gui.hud.toggle();
             TimelineAutoHide.markHidden();
@@ -924,6 +1455,10 @@ public class TimelineScreen extends Screen {
             return true;
         }
         if (super.mouseClicked(event, doubled)) return true;
+
+        if (settingsOpen) {
+            return true;
+        }
 
         if ((event.button() == GLFW.GLFW_MOUSE_BUTTON_MIDDLE
                 || event.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) && beginCameraDrag(event)) {
@@ -993,7 +1528,8 @@ public class TimelineScreen extends Screen {
         }
 
         int toggleX = labelLeft() + rowIndent(row) - hScroll;
-        if (hasChildren(rowIndex) && event.x() >= toggleX && event.x() < toggleX + 20) {
+        if (hasChildren(rowIndex) && event.x() >= toggleX
+                && event.x() < toggleX + leftFoldSlotWidth()) {
             if (!collapsed.remove(rowIndex)) {
                 collapsed.add(rowIndex);
             }
@@ -1020,20 +1556,21 @@ public class TimelineScreen extends Screen {
             previousTick = rows.get(visible.get(scroll - 1)).tick();
         }
 
+        int rowHeight = leftRowHeight();
         int y = LIST_TOP;
         for (int i = scroll; i < visible.size() && y < listBottom; i++) {
             int rowIndex = visible.get(i);
             MTRPayloads.TimelineRow row = rows.get(rowIndex);
 
             if (row.tick() != previousTick) {
-                if (y + ROW_HEIGHT > listBottom) break;
+                if (y + rowHeight > listBottom) break;
                 previousTick = row.tick();
-                y += ROW_HEIGHT;
+                y += rowHeight;
                 if (y >= listBottom) break;
             }
 
-            if (mouseY >= y && mouseY < y + ROW_HEIGHT) return rowIndex;
-            y += ROW_HEIGHT;
+            if (mouseY >= y && mouseY < y + rowHeight) return rowIndex;
+            y += rowHeight;
         }
         return -1;
     }
@@ -1049,6 +1586,10 @@ public class TimelineScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (settingsOpen) {
+            return true;
+        }
+
         // A tilt wheel scrolls sideways directly; control plus the normal wheel is the
         // fallback for the mice that do not have one.
         if (scrollX != 0) {
@@ -1109,7 +1650,7 @@ public class TimelineScreen extends Screen {
     // ── scrollbar dragging ───────────────────────────────────────────────────
 
     private boolean overTimelineVBar(double mouseX, double mouseY) {
-        if (visible.size() <= visibleRowCount()) return false;
+        if (maxTimelineScroll() <= 0) return false;
         return MTRWidgets.isOver(mouseX, mouseY, listRight() - V_SCROLLBAR, LIST_TOP,
                 V_SCROLLBAR, rowsBottom() - LIST_TOP);
     }
@@ -1151,10 +1692,10 @@ public class TimelineScreen extends Screen {
 
     private void applyTimelineVDrag(double mouseY) {
         int rowsOnScreen = visibleRowCount();
-        int maxScroll = Math.max(0, visible.size() - rowsOnScreen);
+        int maxScroll = maxTimelineScroll();
         int trackHeight = rowsBottom() - LIST_TOP;
         scroll = scrollFromTrack(mouseY, LIST_TOP, trackHeight,
-                verticalThumbHeight(trackHeight, rowsOnScreen, visible.size()), maxScroll);
+                verticalThumbHeight(trackHeight, rowsOnScreen, timelineContentSlots), maxScroll);
     }
 
     private void applyTimelineHDrag(double mouseX) {
@@ -1191,6 +1732,10 @@ public class TimelineScreen extends Screen {
 
     @Override
     public boolean mouseDragged(@NonNull MouseButtonEvent event, double dragX, double dragY) {
+        if (settingsOpen) {
+            return super.mouseDragged(event, dragX, dragY);
+        }
+
         switch (dragging) {
             case TIMELINE_V -> applyTimelineVDrag(event.y());
             case TIMELINE_H -> applyTimelineHDrag(event.x());
@@ -1215,6 +1760,10 @@ public class TimelineScreen extends Screen {
 
     @Override
     public boolean mouseReleased(@NonNull MouseButtonEvent event) {
+        if (settingsOpen) {
+            return super.mouseReleased(event);
+        }
+
         if (dragging != Drag.NONE) {
             endDrag();
             return true;
@@ -1271,6 +1820,100 @@ public class TimelineScreen extends Screen {
         graphics.text(this.font, hint, boxX + padding, y, MTRWidgets.TEXT_DIM);
     }
 
+    private void drawSettings(@NonNull GuiGraphicsExtractor graphics) {
+        settingsBoxWidth = Math.min(300, Math.max(220, this.width - 20));
+        settingsBoxHeight = 210;
+        settingsBoxX = (this.width - settingsBoxWidth) / 2;
+        settingsBoxY = Math.max(4, (this.height - settingsBoxHeight) / 2);
+
+        int contentX = settingsBoxX + 16;
+        int widthControlY = settingsBoxY + 43;
+        int fontControlY = settingsBoxY + 83;
+        int rightFontControlY = settingsBoxY + 123;
+        int controlWidth = settingsBoxWidth - 32;
+
+        graphics.fill(0, 0, this.width, this.height, 0xA0000000);
+        MTRWidgets.panel(graphics, settingsBoxX, settingsBoxY, settingsBoxWidth, settingsBoxHeight,
+                         MTRWidgets.PANEL_BG, MTRWidgets.PANEL_BORDER);
+
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.title", "时间轴设置"),
+                contentX, settingsBoxY + 10, MTRWidgets.TEXT_ACCENT);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.sidebar_width", "侧边栏宽度"),
+                contentX, settingsBoxY + 29, MTRWidgets.TEXT);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.range", "范围: %d - %d", MIN_PANEL_WIDTH,
+                        settingsMaxWidth()),
+                settingsBoxX + settingsBoxWidth - 112, settingsBoxY + 30, MTRWidgets.TEXT_DIM);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.left_font_size", "左侧字体大小"),
+                contentX, settingsBoxY + 69, MTRWidgets.TEXT);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.left_font_size_range", "范围: %d%% - %d%%",
+                        FONT_MIN_PERCENT, FONT_MAX_PERCENT),
+                settingsBoxX + settingsBoxWidth - 112, settingsBoxY + 70, MTRWidgets.TEXT_DIM);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.right_font_size", "右侧字体大小"),
+                contentX, settingsBoxY + 109, MTRWidgets.TEXT);
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.right_font_size_range", "范围: %d%% - %d%%",
+                        FONT_MIN_PERCENT, FONT_MAX_PERCENT),
+                settingsBoxX + settingsBoxWidth - 112, settingsBoxY + 110, MTRWidgets.TEXT_DIM);
+
+        sidebarWidthSlider.setX(contentX);
+        sidebarWidthSlider.setY(widthControlY);
+        sidebarWidthSlider.setWidth(controlWidth);
+        sidebarWidthSlider.setHeight(20);
+
+        sidebarWidthInput.setX(contentX);
+        sidebarWidthInput.setY(widthControlY);
+        sidebarWidthInput.setWidth(controlWidth);
+        sidebarWidthInput.setHeight(20);
+        sidebarWidthInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.sidebar_width_hint", "输入 %d - %d", MIN_PANEL_WIDTH,
+                settingsMaxWidth()));
+
+        leftFontSlider.setX(contentX);
+        leftFontSlider.setY(fontControlY);
+        leftFontSlider.setWidth(controlWidth);
+        leftFontSlider.setHeight(20);
+
+        leftFontInput.setX(contentX);
+        leftFontInput.setY(fontControlY);
+        leftFontInput.setWidth(controlWidth);
+        leftFontInput.setHeight(20);
+        leftFontInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.left_font_size_hint", "输入 %d - %d%%",
+                FONT_MIN_PERCENT, FONT_MAX_PERCENT));
+
+        rightFontSlider.setX(contentX);
+        rightFontSlider.setY(rightFontControlY);
+        rightFontSlider.setWidth(controlWidth);
+        rightFontSlider.setHeight(20);
+
+        rightFontInput.setX(contentX);
+        rightFontInput.setY(rightFontControlY);
+        rightFontInput.setWidth(controlWidth);
+        rightFontInput.setHeight(20);
+        rightFontInput.setHint(MTRComponent.translatable(
+                "mtr.timeline.settings.right_font_size_hint", "输入 %d - %d%%",
+                FONT_MIN_PERCENT, FONT_MAX_PERCENT));
+
+        settingsModeButton.setX(contentX);
+        settingsModeButton.setY(settingsBoxY + 157);
+        settingsModeButton.setMessage(settingsModeLabel());
+
+        settingsDoneButton.setX(settingsBoxX + settingsBoxWidth - 96);
+        settingsDoneButton.setY(settingsBoxY + 157);
+
+        graphics.text(this.font,
+                MTRComponent.translatable("mtr.timeline.settings.current",
+                        "侧边栏：%d · 左侧字体：%d%% · 右侧字体：%d%%",
+                settingsCurrentWidth(), leftFontPercent(), rightFontPercent()),
+                contentX, settingsBoxY + 188, MTRWidgets.TEXT_DIM);
+    }
+
     // Grab-scrolling---
 
     private boolean beginGrab(double mouseX, double mouseY) {
@@ -1302,21 +1945,28 @@ public class TimelineScreen extends Screen {
 
     private void applyGrab(double dragX, double dragY) {
         grabRemainder += dragY;
-        int rows = (int) (grabRemainder / ROW_HEIGHT);
-        grabRemainder -= rows * ROW_HEIGHT;
 
         switch (dragging) {
             case GRAB_TIMELINE -> {
+                int rowHeight = leftRowHeight();
+                int rows = (int) (grabRemainder / rowHeight);
+                grabRemainder -= rows * rowHeight;
                 scroll -= rows;
                 hScroll -= (int) Math.round(dragX);
                 clampScroll();
             }
             case GRAB_DETAIL -> {
+                int rowHeight = rightRowHeight();
+                int rows = (int) (grabRemainder / rowHeight);
+                grabRemainder -= rows * rowHeight;
                 detailScroll -= rows;
                 detailHScroll -= (int) Math.round(dragX);
                 clampDetailScroll();
             }
             case GRAB_SUMMARY -> {
+                int rowHeight = rightRowHeight();
+                int rows = (int) (grabRemainder / rowHeight);
+                grabRemainder -= rows * rowHeight;
                 summaryScroll -= rows;
                 clampSummaryScroll();
             }
