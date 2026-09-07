@@ -41,7 +41,7 @@ public class MovingPistonTickMixin {
 
         float currentProgress = entity.getProgress(1.0f);
         float newProgress = Math.min(currentProgress + 0.5f, 1.0f);
-        long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+        long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
         MTRState.recordStep(new MovingPistonTickEvent(
                 currentTick,
@@ -70,7 +70,7 @@ public class MovingPistonTickMixin {
         if (!MTRState.isRecording(level)) return;
         if (!RecordingFilterConfig.isEnabled("moving_piston_despawn")) return;
 
-        long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+        long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
         MTRState.recordStep(new MovingPistonEvent(
                 currentTick,
@@ -94,7 +94,7 @@ public class MovingPistonTickMixin {
         if (!RecordingFilterConfig.isEnabled("moving_piston_despawn")) return;
         if (self.getProgress(1.0f) >= 1.0f) return;
 
-        long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+        long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
         MTRState.recordStep(new MovingPistonEvent(
                 currentTick,

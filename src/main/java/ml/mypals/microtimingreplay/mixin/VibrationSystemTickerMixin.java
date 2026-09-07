@@ -27,7 +27,7 @@ public interface VibrationSystemTickerMixin {
             boolean inside = profile != null && (!profile.outsideArea(destination, dim) || !profile.outsideArea(origin, dim));
             if (inside) {
                 MTRState.pushEvent(new ReceivedGameEventEvent(
-                    serverLevel.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(serverLevel.getServer()) - MTRState.getRecordStartTick(),
                     destination.getX(), destination.getY(), destination.getZ(),
                     origin.getX(), origin.getY(), origin.getZ(),
                     sourceEntity != null ? sourceEntity.getStringUUID() : "",

@@ -53,7 +53,7 @@ public abstract class ServerLevelPhasesMixin {
                 && PhaseType.BLOCK_EVENT.enabled();
         if (mtr$pushedBlockEventPhase) {
             MTRState.pushEvent(new PhaseEvent(
-                this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                 PhaseType.BLOCK_EVENT
             ));
         }
@@ -73,7 +73,7 @@ public abstract class ServerLevelPhasesMixin {
                 && PhaseType.SCHEDULED_TICK.enabled();
         if (mtr$pushedScheduledTickPhase) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.SCHEDULED_TICK
             ));
         }
@@ -92,7 +92,7 @@ public abstract class ServerLevelPhasesMixin {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.ICE_AND_SNOW.enabled()
                 && !MTRState.getActiveProfile().outsideArea(pos, instance.dimension().identifier().toString())) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.ICE_AND_SNOW
             ));
             try {
@@ -109,7 +109,7 @@ public abstract class ServerLevelPhasesMixin {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.RANDOM_TICK.enabled()
                 && !MTRState.getActiveProfile().outsideArea(pos, ((ServerLevel) (Object) this) .dimension().identifier().toString())) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.RANDOM_TICK
             ));
             try {
@@ -138,7 +138,7 @@ public abstract class ServerLevelPhasesMixin {
                 boolean wasInside = !profile.outsideAreaVec3(oldPos, dim);
                 boolean isInside = !profile.outsideAreaVec3(newPos, dim);
 
-                long currentTick = this.getServer().getTickCount() - MTRState.getRecordStartTick();
+                long currentTick = MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick();
                 String uuid = PlayerProxy.replayUuid(entity).toString();
                 String entityTypeKey = PlayerProxy.typeKey(entity);
 
@@ -190,7 +190,7 @@ public abstract class ServerLevelPhasesMixin {
     private void mtr$onTickBlockEntity(ServerLevel instance, Operation<Void> original) {
         if (MTRState.isRecording(instance) && PhaseType.BLOCK_ENTITY.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.BLOCK_ENTITY
             ));
             try {
@@ -207,7 +207,7 @@ public abstract class ServerLevelPhasesMixin {
     private void mtr$onTickDragonFight(EnderDragonFight instance, Operation<Void> original) {
         if (MTRState.isRecording(this.getServer().getLevel(Level.END)) && PhaseType.DRAGON_FIGHT.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.DRAGON_FIGHT
             ));
             try {
@@ -225,7 +225,7 @@ public abstract class ServerLevelPhasesMixin {
     private void mtr$onTickChunk(ServerChunkCache instance, BooleanSupplier haveTime, boolean tickChunks, Operation<Void> original) {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.CHUNK_TICK.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.CHUNK_TICK
             ));
             try {
@@ -242,7 +242,7 @@ public abstract class ServerLevelPhasesMixin {
     private void mtr$onTickEntityListPhase(EntityTickList instance, Consumer<Entity> action, Operation<Void> original) {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.ENTITY_TICK.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     PhaseType.ENTITY_TICK
             ));
             try {

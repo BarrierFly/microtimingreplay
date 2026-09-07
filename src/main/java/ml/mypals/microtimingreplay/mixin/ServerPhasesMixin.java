@@ -29,7 +29,7 @@ public abstract class ServerPhasesMixin {
     private void mtr$onProcessQueuedPackets(PacketProcessor instance, Operation<Void> original) {
         if (MTRState.isRecording(null) && PhaseType.PACKET_PROCESS.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.tickCount - MTRState.getRecordStartTick(),
+                    MTRState.gameTime((MinecraftServer) (Object) this) - MTRState.getRecordStartTick(),
                     PhaseType.PACKET_PROCESS
             ));
             try {
@@ -51,7 +51,7 @@ public abstract class ServerPhasesMixin {
             }
             String dim = level.dimension().identifier().toString();
             MTRState.pushEvent(new LevelTickEvent(
-                    this.tickCount - MTRState.getRecordStartTick(),
+                    MTRState.gameTime((MinecraftServer) (Object) this) - MTRState.getRecordStartTick(),
                     PhaseType.LEVEL_TICK,
                     dim
             ));
@@ -68,7 +68,7 @@ public abstract class ServerPhasesMixin {
     private void mtr$onTickAsyncTaskPhase(Operation<Void> original) {
         if (MTRState.isRecording(null) && PhaseType.ASYNC_TASK.enabled()) {
             MTRState.pushEvent(new PhaseEvent(
-                    this.tickCount - MTRState.getRecordStartTick(),
+                    MTRState.gameTime((MinecraftServer) (Object) this) - MTRState.getRecordStartTick(),
                     PhaseType.ASYNC_TASK
             ));
             try {
@@ -90,7 +90,7 @@ public abstract class ServerPhasesMixin {
                 return;
             }
             MTRState.pushEvent(new PhaseEvent(
-                    this.tickCount - MTRState.getRecordStartTick(),
+                    MTRState.gameTime((MinecraftServer) (Object) this) - MTRState.getRecordStartTick(),
                     PhaseType.PLAYER_TICK
             ));
             try {

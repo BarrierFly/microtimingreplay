@@ -27,7 +27,7 @@ public interface NeighborUpdaterMixin {
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
-                long tick = level.getServer() != null ? level.getServer().getTickCount() - MTRState.getRecordStartTick() : 0;
+                long tick = level.getServer() != null ? MTRState.gameTime(level.getServer()) - MTRState.getRecordStartTick() : 0;
                 MTRState.pushEvent(new UpdateEvent(tick, "NeighbourUpdate", pos));
             }
         }
@@ -51,7 +51,7 @@ public interface NeighborUpdaterMixin {
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = realLevel.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
-                long tick = realLevel.getServer() != null ? realLevel.getServer().getTickCount() - MTRState.getRecordStartTick() : 0;
+                long tick = realLevel.getServer() != null ? MTRState.gameTime(realLevel.getServer()) - MTRState.getRecordStartTick() : 0;
                 MTRState.pushEvent(new UpdateEvent(tick, "ShapeUpdate", pos));
             }
         }

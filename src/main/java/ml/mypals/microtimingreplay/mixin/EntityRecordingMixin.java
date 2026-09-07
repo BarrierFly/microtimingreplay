@@ -38,7 +38,7 @@ public abstract class EntityRecordingMixin {
             if (activeProfile != null) {
                 String dim = entity.level().dimension().identifier().toString();
                 if (!activeProfile.outsideAreaVec3(entity.position(), dim)) {
-                    long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                    long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
                     EntitySpawnEvent event = new EntitySpawnEvent(
                         currentTick,
@@ -85,7 +85,7 @@ public abstract class EntityRecordingMixin {
 
                 if (oldPos.distanceToSqr(newPos) > 1e-7 || vec.lengthSqr() > 1e-7) {
                     if (!activeProfile.outsideAreaVec3(oldPos, dim) || !activeProfile.outsideAreaVec3(newPos, dim)) {
-                        long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                        long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
                         String uuid = PlayerProxy.replayUuid(entity).toString();
                         String entityTypeKey = PlayerProxy.typeKey(entity);
                         Vec3 delta = entity.getDeltaMovement();

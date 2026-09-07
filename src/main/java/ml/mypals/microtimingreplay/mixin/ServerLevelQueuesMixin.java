@@ -53,7 +53,7 @@ public abstract class ServerLevelQueuesMixin {
             if (activeProfile != null) {
                 String dim = entity.level().dimension().identifier().toString();
                 if (!activeProfile.outsideAreaVec3(entity.position(), dim)) {
-                    long currentTick = this.getServer().getTickCount() - MTRState.getRecordStartTick();
+                    long currentTick = MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick();
 
                     EntitySpawnEvent event = new EntitySpawnEvent(
                             currentTick,
@@ -81,7 +81,7 @@ public abstract class ServerLevelQueuesMixin {
             String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(eventData.pos(), dim)) {
                 MTRState.pushEvent(new QueueEvent(
-                    this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                    MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                     "ExecuteBlockEvent",
                     eventData.pos(),
                     dim
@@ -111,7 +111,7 @@ public abstract class ServerLevelQueuesMixin {
             String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 MTRState.pushEvent(new QueueEvent(
-                        this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                        MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                         "ExecuteBlockTick",
                         pos,
                         dim
@@ -141,7 +141,7 @@ public abstract class ServerLevelQueuesMixin {
             String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 MTRState.pushEvent(new QueueEvent(
-                        this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                        MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                         "ExecuteFluidTick",
                         pos,
                         dim
@@ -171,7 +171,7 @@ public abstract class ServerLevelQueuesMixin {
             String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideAreaVec3(position, dim)) {
                 MTRState.pushEvent(new PostGameEventEvent(
-                        this.getServer().getTickCount() - MTRState.getRecordStartTick(),
+                        MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick(),
                         position.x(), position.y(), position.z(),
                         context.affectedState() != null ? Block.getId(context.affectedState()) : -1,
                         context.sourceEntity() != null ? context.sourceEntity().getStringUUID() : "",
@@ -202,7 +202,7 @@ public abstract class ServerLevelQueuesMixin {
             if (activeProfile != null) {
                 String dim = level.dimension().identifier().toString();
                 if (activeProfile.outsideArea(pos, dim)) return;
-                long currentTick = this.getServer().getTickCount() - MTRState.getRecordStartTick();
+                long currentTick = MTRState.gameTime(this.getServer()) - MTRState.getRecordStartTick();
                 int blockStateId = Block.getId(block.defaultBlockState());
 
                 // blockEvents is a Set of a record keyed on all four values, so an identical

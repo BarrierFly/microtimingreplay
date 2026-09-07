@@ -27,7 +27,7 @@ public class CollectingNeighborUpdaterMixin {
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = this.level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
-                long tick = this.level.getServer() != null ? this.level.getServer().getTickCount() - MTRState.getRecordStartTick() : 0;
+                long tick = this.level.getServer() != null ? MTRState.gameTime(this.level.getServer()) - MTRState.getRecordStartTick() : 0;
                 MTRState.pushEvent(new UpdateEvent(tick, "ShapeUpdate", pos));
             }
         }

@@ -35,7 +35,7 @@ public abstract class LivingEntityRecordingMixin {
             if (activeProfile != null) {
                 String dim = entity.level().dimension().identifier().toString();
                 if (!activeProfile.outsideAreaVec3(entity.position(), dim)) {
-                    long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                    long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
                     EntitySetHealthEvent event = new EntitySetHealthEvent(
                             currentTick,

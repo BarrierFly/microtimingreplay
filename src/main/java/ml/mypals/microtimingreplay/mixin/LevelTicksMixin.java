@@ -42,7 +42,7 @@ public abstract class LevelTicksMixin<T> {
             if (profile != null && profile.outsideArea(tick.pos(), dimension)) {
                 return;
             }
-            long trigger = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+            long trigger = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
             String typeId;
             if (tick.type() instanceof Block b) {
                 typeId = BuiltInRegistries.BLOCK.getKey(b).toString();

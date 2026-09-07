@@ -55,7 +55,7 @@ public abstract class LevelMixin implements ScheduledTickAccess {
                 BlockState oldState = this.getBlockState(pos);
                 int oldStateId = Block.getId(oldState);
                 int newStateId = Block.getId(blockState);
-                long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
 
                 SetBlockEvent event = new SetBlockEvent(
                     currentTick, updateFlags, updateLimit,
@@ -88,7 +88,7 @@ public abstract class LevelMixin implements ScheduledTickAccess {
 
         if (blockEntity instanceof PistonMovingBlockEntity piston) {
             if (RecordingFilterConfig.isEnabled("moving_piston_start")) {
-                long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
                 MTRState.recordStep(new MovingPistonEvent(
                         currentTick,
                         piston.getBlockPos(),
@@ -104,7 +104,7 @@ public abstract class LevelMixin implements ScheduledTickAccess {
             if (RecordingFilterConfig.isEnabled("block_entity_creation")) {
                 BlockPos pos = blockEntity.getBlockPos();
                 if (activeProfile != null && !activeProfile.outsideArea(pos, dim)) {
-                    long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
+                    long currentTick = MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick();
                     String typeKey = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
 
                     MTRState.recordStep(new BlockEntityCreationEvent(
@@ -135,7 +135,7 @@ public abstract class LevelMixin implements ScheduledTickAccess {
         }
 
         MTRState.pushEvent(new BlockEntityTickEvent(
-                MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick(),
+                MTRState.gameTime(MicroTimingReplay.server) - MTRState.getRecordStartTick(),
                 ticker.getType(),
                 ticker.getPos(),
                 dim

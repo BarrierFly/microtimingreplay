@@ -46,7 +46,7 @@ public abstract class ServerNetworkPacketMixin {
                 MTRProfile profile = MTRState.getActiveProfile();
                 Vec3 pos = player.position();
                 if (profile != null && !profile.outsideAreaVec3(pos, dim)) {
-                    long tick = level.getServer().getTickCount() - MTRState.getRecordStartTick();
+                    long tick = MTRState.gameTime(level.getServer()) - MTRState.getRecordStartTick();
                     String packetName = packet.getClass().getSimpleName();
                     NetworkPacketEvent event = new NetworkPacketEvent(
                             tick,
@@ -81,7 +81,7 @@ public abstract class ServerNetworkPacketMixin {
                 MTRProfile profile = MTRState.getActiveProfile();
                 Vec3 pos = player.position();
                 if (profile != null && !profile.outsideAreaVec3(pos, dim)) {
-                    long tick = level.getServer().getTickCount() - MTRState.getRecordStartTick();
+                    long tick = MTRState.gameTime(level.getServer()) - MTRState.getRecordStartTick();
                     String packetName = packet.getClass().getSimpleName();
                     NetworkPacketEvent event = new NetworkPacketEvent(
                             tick,

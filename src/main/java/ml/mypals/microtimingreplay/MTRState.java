@@ -29,6 +29,14 @@ public class MTRState {
     private static long recordTargetTick = -1;
     public static final Stack<MTREvent> currentEventStack = new Stack<>();
 
+    public static long gameTime(MinecraftServer server) {
+        return server.overworld().getGameTime();
+    }
+
+    private static long gameTime() {
+        return gameTime(MicroTimingReplay.server);
+    }
+
     public static State getCurrentState() {
         return currentState;
     }
@@ -65,8 +73,8 @@ public class MTRState {
 
         currentState = State.RECORDING;
         activeProfile = profile;
-        recordStartTick = server.getTickCount() - profile.getTicksRecorded();
-        recordTargetTick = server.getTickCount() + advance;
+        recordStartTick = gameTime(server) - profile.getTicksRecorded();
+        recordTargetTick = gameTime(server) + advance;
         currentEventStack.clear();
 
         if (profile.getTicksRecorded() == 0) {
@@ -90,7 +98,7 @@ public class MTRState {
 
     public static void stopRecording() {
         if (currentState == State.RECORDING && activeProfile != null) {
-            long ticks = MicroTimingReplay.server.getTickCount() - recordStartTick;
+            long ticks = gameTime() - recordStartTick;
             activeProfile.setTicksRecorded((int) ticks);
             ProfileManager.saveProfile(activeProfile);
             StackTraceManager.collectAndSaveForProfile(activeProfile);
@@ -112,8 +120,8 @@ public class MTRState {
                 currentEventStack.clear();
             }
             if (recordTargetTick != -1) {
-                RecordingBossBar.tick(server, recordTargetTick - server.getTickCount());
-                if (server.getTickCount() >= recordTargetTick) {
+                RecordingBossBar.tick(server, recordTargetTick - gameTime(server));
+                if (gameTime(server) >= recordTargetTick) {
                     stopRecording();
                 }
             }
@@ -149,7 +157,7 @@ public class MTRState {
             return;
 
         if (currentEventStack.isEmpty()) {
-            activeProfile.addEvent(MicroTimingReplay.server.getTickCount() - recordStartTick, event);
+            activeProfile.addEvent(gameTime() - recordStartTick, event);
         } else {
             currentEventStack.peek().addChild(event);
         }
@@ -165,7 +173,7 @@ public class MTRState {
             if (!currentEventStack.isEmpty()) {
                 currentEventStack.peek().removeChild(popped);
             } else {
-                long currentTick = MicroTimingReplay.server.getTickCount() - recordStartTick;
+                long currentTick = gameTime() - recordStartTick;
                 activeProfile.removeEvent(currentTick, popped);
             }
         }
@@ -176,7 +184,7 @@ public class MTRState {
             return;
 
         if (currentEventStack.isEmpty()) {
-            activeProfile.addEvent(MicroTimingReplay.server.getTickCount() - recordStartTick, step);
+            activeProfile.addEvent(gameTime() - recordStartTick, step);
         } else {
             currentEventStack.peek().addChild(step);
         }
