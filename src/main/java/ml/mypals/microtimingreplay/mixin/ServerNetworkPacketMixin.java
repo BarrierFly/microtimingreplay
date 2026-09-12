@@ -2,7 +2,7 @@ package ml.mypals.microtimingreplay.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.minecraft.network.PacketSendListener;
+import io.netty.channel.ChannelFutureListener;
 import ml.mypals.microtimingreplay.MTRState;
 import ml.mypals.microtimingreplay.config.RecordingFilterConfig;
 import ml.mypals.microtimingreplay.event.NetworkPacketEvent;
@@ -30,8 +30,9 @@ public abstract class ServerNetworkPacketMixin {
 
     // 三个 send 重载最终都汇入这个三参版本；单参的 send(Packet) 服务端从来不调，
     // ServerCommonPacketListenerImpl 直接调双参/三参，所以只钩单参会一条都记不到。
-    @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketSendListener;Z)V", at = @At("HEAD"))
-    private void mtr$onSendPacket(Packet<?> packet, PacketSendListener listener, boolean flush, CallbackInfo ci) {
+    // 1.21.9+ 把 send 的回调参数从 PacketSendListener 换成了 ChannelFutureListener。
+    @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;Lio/netty/channel/ChannelFutureListener;Z)V", at = @At("HEAD"))
+    private void mtr$onSendPacket(Packet<?> packet, ChannelFutureListener listener, boolean flush, CallbackInfo ci) {
         mtr$recordPacket(packet);
     }
 

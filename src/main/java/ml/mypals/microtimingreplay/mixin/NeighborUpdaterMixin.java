@@ -11,6 +11,7 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.NeighborUpdater;
+import net.minecraft.world.level.redstone.Orientation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,8 +20,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(NeighborUpdater.class)
 public interface NeighborUpdaterMixin {
 
+    // 1.21.2+ replaced executeUpdate's neighbor BlockPos with an Orientation.
     @Inject(method = "executeUpdate", at = @At("HEAD"))
-    private static void mtr$onExecuteUpdateHead(Level level, BlockState state, BlockPos pos, Block changedBlock, BlockPos neighborPos, boolean movedByPiston, CallbackInfo ci) {
+    private static void mtr$onExecuteUpdateHead(Level level, BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston, CallbackInfo ci) {
         if (MTRState.isRecording(level)) {
             if (!RecordingFilterConfig.isEnabled("neighbor_update")) return;
             MTRProfile profile = MTRState.getActiveProfile();
@@ -33,7 +35,7 @@ public interface NeighborUpdaterMixin {
     }
 
     @Inject(method = "executeUpdate", at = @At("RETURN"))
-    private static void mtr$onExecuteUpdateReturn(Level level, BlockState state, BlockPos pos, Block changedBlock, BlockPos neighborPos, boolean movedByPiston, CallbackInfo ci) {
+    private static void mtr$onExecuteUpdateReturn(Level level, BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston, CallbackInfo ci) {
         if (MTRState.isRecording(level)) {
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = level.dimension().identifier().toString();
@@ -43,8 +45,9 @@ public interface NeighborUpdaterMixin {
         }
     }
 
+    // 1.21.2+ reordered executeShapeUpdate: the two BlockPos come before the BlockState.
     @Inject(method = "executeShapeUpdate", at = @At("HEAD"))
-    private static void mtr$onExecuteShapeUpdateHead(LevelAccessor level, Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit, CallbackInfo ci) {
+    private static void mtr$onExecuteShapeUpdateHead(LevelAccessor level, Direction direction, BlockPos pos, BlockPos neighborPos, BlockState neighborState, int updateFlags, int updateLimit, CallbackInfo ci) {
         if (level instanceof Level realLevel && MTRState.isRecording(realLevel)) {
             if (!RecordingFilterConfig.isEnabled("shape_update")) return;
             MTRProfile profile = MTRState.getActiveProfile();
@@ -57,7 +60,7 @@ public interface NeighborUpdaterMixin {
     }
 
     @Inject(method = "executeShapeUpdate", at = @At("RETURN"))
-    private static void mtr$onExecuteShapeUpdateReturn(LevelAccessor level, Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit, CallbackInfo ci) {
+    private static void mtr$onExecuteShapeUpdateReturn(LevelAccessor level, Direction direction, BlockPos pos, BlockPos neighborPos, BlockState neighborState, int updateFlags, int updateLimit, CallbackInfo ci) {
         if (level instanceof Level realLevel && MTRState.isRecording(realLevel)) {
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = realLevel.dimension().identifier().toString();
