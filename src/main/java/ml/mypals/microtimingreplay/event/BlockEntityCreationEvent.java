@@ -81,15 +81,15 @@ public class BlockEntityCreationEvent extends BlockPosEvent {
 
     public static BlockEntityCreationEvent readNBT(CompoundTag tag) {
         BlockPos pos = new BlockPos(
-                tag.getInt("x"),
-                tag.getInt("y"),
-                tag.getInt("z")
+                tag.getInt("x").orElse(0),
+                tag.getInt("y").orElse(0),
+                tag.getInt("z").orElse(0)
         );
         BlockEntityCreationEvent event = new BlockEntityCreationEvent(
-                tag.getLong("tick"),
+                tag.getLong("tick").orElse(0L),
                 pos,
-                tag.getString("blockEntityType"),
-                tag.getString("dimension")
+                tag.getString("blockEntityType").orElse(""),
+                tag.getString("dimension").orElse("")
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

@@ -94,7 +94,7 @@ public abstract class ServerLevelPhasesMixin {
     @WrapOperation(method = "tickChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;tickPrecipitation(Lnet/minecraft/core/BlockPos;)V"))
     private void mtr$onIceAndSnow(ServerLevel instance, BlockPos pos, Operation<Void> original) {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.ICE_AND_SNOW.enabled()
-                && !MTRState.getActiveProfile().outsideArea(pos, instance.dimension().location().toString())) {
+                && !MTRState.getActiveProfile().outsideArea(pos, instance.dimension().identifier().toString())) {
             MTRState.pushEvent(new PhaseEvent(
                     this.getServer().getTickCount() - MTRState.getRecordStartTick(),
                     PhaseType.ICE_AND_SNOW
@@ -111,7 +111,7 @@ public abstract class ServerLevelPhasesMixin {
     @WrapOperation(method = "tickChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
     private void mtr$onRandomTickBlock(BlockState instance, ServerLevel serverLevel, BlockPos pos, RandomSource randomSource, Operation<Void> original) {
         if (MTRState.isRecording((ServerLevel) (Object) this) && PhaseType.RANDOM_TICK.enabled()
-                && !MTRState.getActiveProfile().outsideArea(pos, ((ServerLevel) (Object) this) .dimension().location().toString())) {
+                && !MTRState.getActiveProfile().outsideArea(pos, ((ServerLevel) (Object) this) .dimension().identifier().toString())) {
             MTRState.pushEvent(new PhaseEvent(
                     this.getServer().getTickCount() - MTRState.getRecordStartTick(),
                     PhaseType.RANDOM_TICK
@@ -135,7 +135,7 @@ public abstract class ServerLevelPhasesMixin {
         if (MTRState.isRecording(level)) {
             MTRProfile profile = MTRState.getActiveProfile();
             if (profile != null) {
-                String dim = level.dimension().location().toString();
+                String dim = level.dimension().identifier().toString();
                 Vec3 oldPos = new Vec3(entity.xo, entity.yo, entity.zo);
                 Vec3 newPos = entity.position();
 

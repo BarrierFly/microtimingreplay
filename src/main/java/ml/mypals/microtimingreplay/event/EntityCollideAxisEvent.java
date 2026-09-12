@@ -1,7 +1,5 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import ml.mypals.microtimingreplay.marker.MTRMarker;
 import ml.mypals.microtimingreplay.replay.EntityReplayManager;
 import ml.mypals.microtimingreplay.util.DisplayUtils;
@@ -132,9 +130,9 @@ public class EntityCollideAxisEvent extends Vec3PosEvent {
         Entity entity = EntityReplayManager.getEntity(level, uuid);
         if (entity != null) {
             if (forward) {
-                entity.absMoveTo(getX(), getY(), getZ(), yaw, pitch);
+                entity.absSnapTo(getX(), getY(), getZ(), yaw, pitch);
             } else {
-                entity.absMoveTo(oldX, oldY, oldZ, yaw, pitch);
+                entity.absSnapTo(oldX, oldY, oldZ, yaw, pitch);
             }
             entity.setDeltaMovement(0, 0, 0);
             EntityReplayManager.syncEntityPosition(level, entity);
@@ -178,21 +176,21 @@ public class EntityCollideAxisEvent extends Vec3PosEvent {
 
     public static EntityCollideAxisEvent readNBT(CompoundTag tag) {
         EntityCollideAxisEvent event = new EntityCollideAxisEvent(
-                tag.getLong("tick"),
-                tag.getString("entityUuid"),
-                tag.getString("entityType"),
-                MTRNbt.getString(tag, "axis", "X"),
-                tag.getDouble("oldX"),
-                tag.getDouble("oldY"),
-                tag.getDouble("oldZ"),
-                tag.getDouble("x"),
-                tag.getDouble("y"),
-                tag.getDouble("z"),
-                tag.getFloat("yaw"),
-                tag.getFloat("pitch"),
-                tag.getDouble("attemptedDistance"),
-                tag.getDouble("collisionDistance"),
-                tag.getString("dimension")
+                tag.getLong("tick").orElse(0L),
+                tag.getString("entityUuid").orElse(""),
+                tag.getString("entityType").orElse(""),
+                tag.getString("axis").orElse("X"),
+                tag.getDouble("oldX").orElse(0.0),
+                tag.getDouble("oldY").orElse(0.0),
+                tag.getDouble("oldZ").orElse(0.0),
+                tag.getDouble("x").orElse(0.0),
+                tag.getDouble("y").orElse(0.0),
+                tag.getDouble("z").orElse(0.0),
+                tag.getFloat("yaw").orElse(0.0f),
+                tag.getFloat("pitch").orElse(0.0f),
+                tag.getDouble("attemptedDistance").orElse(0.0),
+                tag.getDouble("collisionDistance").orElse(0.0),
+                tag.getString("dimension").orElse("")
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

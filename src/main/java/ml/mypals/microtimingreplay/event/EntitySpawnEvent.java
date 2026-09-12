@@ -1,7 +1,5 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 
 import ml.mypals.microtimingreplay.replay.EntityReplayManager;
 import ml.mypals.microtimingreplay.util.MTRComponent;
@@ -92,7 +90,7 @@ public class EntitySpawnEvent extends Vec3PosEvent {
     @Override
     public void applySelf(ServerLevel level, boolean forward) {
         if (entityUuid == null || entityUuid.isEmpty()
-                || !level.dimension().location().toString().equals(getDimension())) return;
+                || !level.dimension().identifier().toString().equals(getDimension())) return;
         UUID uuid;
         try {
             uuid = UUID.fromString(entityUuid);
@@ -132,18 +130,18 @@ public class EntitySpawnEvent extends Vec3PosEvent {
 
     public static EntitySpawnEvent readNBT(CompoundTag tag) {
         EntitySpawnEvent event = new EntitySpawnEvent(
-                tag.getLong("tick"),
-                tag.getString("entityUuid"),
-                tag.getString("entityType"),
-                tag.getCompound("entityNbt"),
-                tag.getDouble("x"),
-                tag.getDouble("y"),
-                tag.getDouble("z"),
-                tag.getFloat("yaw"),
-                tag.getFloat("pitch"),
-                tag.getBoolean("despawn"),
-                tag.getString("dimension"),
-                MTRNbt.getInt(tag, "eid", -1)
+                tag.getLong("tick").orElse(0L),
+                tag.getString("entityUuid").orElse(""),
+                tag.getString("entityType").orElse(""),
+                tag.getCompound("entityNbt").orElse(new CompoundTag()),
+                tag.getDouble("x").orElse(0.0),
+                tag.getDouble("y").orElse(0.0),
+                tag.getDouble("z").orElse(0.0),
+                tag.getFloat("yaw").orElse(0.0f),
+                tag.getFloat("pitch").orElse(0.0f),
+                tag.getBoolean("despawn").orElse(false),
+                tag.getString("dimension").orElse(""),
+                tag.getInt("eid").orElse(-1)
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

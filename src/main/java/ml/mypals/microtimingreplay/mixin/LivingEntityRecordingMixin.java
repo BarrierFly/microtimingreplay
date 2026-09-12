@@ -33,7 +33,7 @@ public abstract class LivingEntityRecordingMixin {
             if (!RecordingFilterConfig.isEnabled("entity_set_health")) return;
             MTRProfile activeProfile = MTRState.getActiveProfile();
             if (activeProfile != null) {
-                String dim = entity.level().dimension().location().toString();
+                String dim = entity.level().dimension().identifier().toString();
                 if (!activeProfile.outsideAreaVec3(entity.position(), dim)) {
                     long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
 

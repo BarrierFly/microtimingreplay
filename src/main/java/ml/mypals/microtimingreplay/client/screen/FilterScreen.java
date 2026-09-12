@@ -8,6 +8,7 @@ import ml.mypals.microtimingreplay.util.MTRComponent;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -159,8 +160,10 @@ public class FilterScreen extends Screen {
     // ── input ────────────────────────────────────────────────────────────────
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (super.mouseClicked(event, doubled)) return true;
+        double mouseX = event.x();
+        double mouseY = event.y();
 
         for (Tab tab : tabs()) {
             if (MTRWidgets.isOver(mouseX, mouseY, tab.x(), 32, tab.width(), TAB_HEIGHT)) {

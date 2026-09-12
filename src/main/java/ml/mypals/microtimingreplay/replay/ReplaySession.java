@@ -20,7 +20,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
@@ -352,7 +352,7 @@ public class ReplaySession {
         MTRNetworking.broadcastCursor(this, watching);
         for (ServerPlayer player : watching) {
             if (PlayerPositioner.isFollowing(player)) {
-                PlayerPositioner.focusOnCursor(player, this, player.serverLevel());
+                PlayerPositioner.focusOnCursor(player, this, player.level());
             }
         }
     }
@@ -681,7 +681,7 @@ public class ReplaySession {
         if (parts.length != 2) return defaultLevel;
         ResourceKey<Level> key = ResourceKey.create(
                 Registries.DIMENSION,
-                ResourceLocation.fromNamespaceAndPath(parts[0], parts[1])
+                Identifier.fromNamespaceAndPath(parts[0], parts[1])
         );
         ServerLevel resolved = server.getLevel(key);
         return resolved != null ? resolved : defaultLevel;

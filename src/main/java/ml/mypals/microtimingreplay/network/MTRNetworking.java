@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -31,6 +32,12 @@ public class MTRNetworking {
 
     /** Keeps one scroll gesture from asking the server for arbitrarily much work. */
     private static final int MAX_STEP_AMOUNT = 4096;
+
+    /** A very long recording's whole timeline, split across packets by Fabric. */
+    private static final int MAX_TIMELINE_BYTES = 64 * 1024 * 1024;
+
+    /** A deep call stack is not small either, but stays well below the timeline. */
+    private static final int MAX_DETAILS_BYTES = 4 * 1024 * 1024;
 
     /**
      * Runs on both sides — the mod's main entrypoint is environment-agnostic, and both
@@ -53,11 +60,10 @@ public class MTRNetworking {
         PayloadTypeRegistry.playS2C().register(MTRPayloads.CursorS2C.TYPE, MTRPayloads.CursorS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(MTRPayloads.FilterS2C.TYPE, MTRPayloads.FilterS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(MTRPayloads.OpenScreenS2C.TYPE, MTRPayloads.OpenScreenS2C.CODEC);
-        // These two can outgrow the 1 MiB vanilla payload cap. Fabric's networking API on
-        // 1.21.1 has no registerLarge, so a timeline past that ceiling drops the connection
-        // rather than being split — keep an eye on it for very long recordings.
-        PayloadTypeRegistry.playS2C().register(MTRPayloads.TimelineS2C.TYPE, MTRPayloads.TimelineS2C.CODEC);
-        PayloadTypeRegistry.playS2C().register(MTRPayloads.DetailsS2C.TYPE, MTRPayloads.DetailsS2C.CODEC);
+        // Both can outgrow the 1 MiB vanilla payload cap; registerLarge makes Fabric
+        // split them across packets instead of dropping the connection.
+        PayloadTypeRegistry.playS2C().registerLarge(MTRPayloads.TimelineS2C.TYPE, MTRPayloads.TimelineS2C.CODEC, MAX_TIMELINE_BYTES);
+        PayloadTypeRegistry.playS2C().registerLarge(MTRPayloads.DetailsS2C.TYPE, MTRPayloads.DetailsS2C.CODEC, MAX_DETAILS_BYTES);
     }
 
     public static void registerServerHandlers() {
@@ -106,7 +112,7 @@ public class MTRNetworking {
             ReplaySession session = ReplayManager.subscribedSession(player);
             if (session == null || !session.isRunning()) return;
 
-            session.advance(player.serverLevel(), Math.clamp(payload.amount(), 1, MAX_STEP_AMOUNT),
+            session.advance(player.level(), Math.clamp(payload.amount(), 1, MAX_STEP_AMOUNT),
                     payload.unit(), payload.forward());
         });
 
@@ -117,7 +123,7 @@ public class MTRNetworking {
             ReplaySession session = ReplayManager.subscribedSession(player);
             if (session == null || !session.isRunning()) return;
 
-            session.jumpToStep(player.serverLevel(), payload.step());
+            session.jumpToStep(player.level(), payload.step());
         });
 
         ServerPlayNetworking.registerGlobalReceiver(MTRPayloads.SetCameraFollowC2S.TYPE, (payload, context) -> {
@@ -132,7 +138,7 @@ public class MTRNetworking {
                 if (session == null || !session.isRunning()) return;
 
                 PlayerPositioner.enable(player);
-                PlayerPositioner.focusOnCursor(player, session, player.serverLevel());
+                PlayerPositioner.focusOnCursor(player, session, player.level());
             }
             sendSessions(player);
         });
@@ -157,7 +163,7 @@ public class MTRNetworking {
     }
 
     public static boolean isAllowed(ServerPlayer player) {
-        return player != null && player.hasPermissions(2);
+        return player != null && player.permissions().hasPermission(Permissions.COMMANDS_ADMIN);
     }
 
     // ── pushes ───────────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@ public abstract class ServerNetworkPacketMixin {
             player.level();
             Level level = player.level();
             if (MTRState.isRecording(level) && RecordingFilterConfig.isEnabled("network_packet")) {
-                String dim = level.dimension().location().toString();
+                String dim = level.dimension().identifier().toString();
                 MTRProfile profile = MTRState.getActiveProfile();
                 Vec3 pos = player.position();
                 if (profile != null && !profile.outsideAreaVec3(pos, dim)) {
@@ -77,7 +77,7 @@ public abstract class ServerNetworkPacketMixin {
             player.level();
             Level level = player.level();
             if (MTRState.isRecording(level) && RecordingFilterConfig.isEnabled("network_packet")) {
-                String dim = level.dimension().location().toString();
+                String dim = level.dimension().identifier().toString();
                 MTRProfile profile = MTRState.getActiveProfile();
                 Vec3 pos = player.position();
                 if (profile != null && !profile.outsideAreaVec3(pos, dim)) {

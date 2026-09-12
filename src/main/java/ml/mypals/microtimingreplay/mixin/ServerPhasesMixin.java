@@ -51,7 +51,7 @@ public abstract class ServerPhasesMixin {
                 original.call(level, hasTimeLeft);
                 return;
             }
-            String dim = level.dimension().location().toString();
+            String dim = level.dimension().identifier().toString();
             MTRState.pushEvent(new LevelTickEvent(
                     this.tickCount - MTRState.getRecordStartTick(),
                     PhaseType.LEVEL_TICK,

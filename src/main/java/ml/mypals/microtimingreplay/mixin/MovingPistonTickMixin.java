@@ -51,7 +51,7 @@ public class MovingPistonTickMixin {
                 entity.getDirection(),
                 entity.isExtending(),
                 entity.isSourcePiston(),
-                level.dimension().location().toString()
+                level.dimension().identifier().toString()
         ));
     }
 
@@ -80,7 +80,7 @@ public class MovingPistonTickMixin {
                 entity.isExtending(),
                 entity.isSourcePiston(),
                 true, // despawn
-                level.dimension().location().toString()
+                level.dimension().identifier().toString()
         ));
     }
 
@@ -104,7 +104,7 @@ public class MovingPistonTickMixin {
                 self.isExtending(),
                 self.isSourcePiston(),
                 true, // despawn
-                level.dimension().location().toString()
+                level.dimension().identifier().toString()
         ));
     }
 }

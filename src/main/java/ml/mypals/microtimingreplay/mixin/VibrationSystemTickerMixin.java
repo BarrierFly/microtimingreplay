@@ -23,7 +23,7 @@ public interface VibrationSystemTickerMixin {
     private static void mtr$onReceiveVibration(VibrationSystem.User instance, ServerLevel serverLevel, BlockPos origin, Holder<GameEvent> gameEventHolder, @Nullable Entity sourceEntity, @Nullable Entity projOwner, float v, Operation<Void> original, @Local(name = "blockPos2") BlockPos destination) {
         if (MTRState.isRecording(serverLevel)) {
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = serverLevel.dimension().location().toString();
+            String dim = serverLevel.dimension().identifier().toString();
             boolean inside = profile != null && (!profile.outsideArea(destination, dim) || !profile.outsideArea(origin, dim));
             if (inside) {
                 MTRState.pushEvent(new ReceivedGameEventEvent(

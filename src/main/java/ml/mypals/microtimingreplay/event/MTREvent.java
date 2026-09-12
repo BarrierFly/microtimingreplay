@@ -1,9 +1,6 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 
 import ml.mypals.microtimingreplay.config.RecordMode;
 import ml.mypals.microtimingreplay.config.RecordingFilterConfig;
@@ -199,13 +196,13 @@ public abstract class MTREvent {
     public abstract CompoundTag writeNBT();
 
     public static MTREvent readNBT(CompoundTag tag) {
-        String eventType = MTRNbt.getString(tag, "type", "unknown");
+        String eventType = tag.getString("type").orElse("unknown");
         EventFactory factory = REGISTRY.get(eventType);
         if (factory != null) {
             return factory.create(tag);
         }
         
-        return new MTREvent(eventType, tag.getLong("tick")) {
+        return new MTREvent(eventType, tag.getLong("tick").orElse(0L)) {
             @Override
             public CompoundTag writeNBT() {
                 CompoundTag fallback = new CompoundTag();
@@ -250,10 +247,10 @@ public abstract class MTREvent {
 
     public static void readStackTraceNBT(MTREvent event, CompoundTag tag) {
         if (event != null && tag.contains("stackTrace")) {
-            ListTag linesTag = tag.getList("stackTrace", Tag.TAG_STRING);
+            ListTag linesTag = tag.getList("stackTrace").orElse(new ListTag());
             List<String> lines = new ArrayList<>();
             for (int i = 0; i < linesTag.size(); i++) {
-                lines.add(linesTag.getString(i));
+                linesTag.getString(i).ifPresent(lines::add);
             }
             event.setStackTrace(lines);
         }
@@ -262,9 +259,9 @@ public abstract class MTREvent {
     public static void readChildrenNBT(MTREvent event, CompoundTag tag) {
         readStackTraceNBT(event, tag);
         if (tag.contains("children")) {
-            ListTag list = tag.getList("children", Tag.TAG_COMPOUND);
+            ListTag list = tag.getList("children").orElse(new ListTag());
             for (int i = 0; i < list.size(); i++) {
-                event.addChild(readNBT(list.getCompound(i)));
+                event.addChild(readNBT(list.getCompound(i).orElse(new CompoundTag())));
             }
         }
     }

@@ -1,7 +1,5 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import ml.mypals.microtimingreplay.util.MTRComponent;
 
 import net.minecraft.core.Direction;
@@ -15,7 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -99,19 +97,19 @@ public class AddBlockEventEvent extends BlockPosEvent {
     public static AddBlockEventEvent readNBT(CompoundTag tag) {
         int stateId;
         if (tag.contains("blockName")) {
-            Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.tryParse(MTRNbt.getString(tag, "blockName", "minecraft:air"))).orElse(Blocks.AIR);
+            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.tryParse(tag.getString("blockName").orElse("minecraft:air"))).orElse(Blocks.AIR);
             stateId = Block.getId(block.defaultBlockState());
         } else {
-            stateId = tag.getInt("blockStateId");
+            stateId = tag.getInt("blockStateId").orElse(0);
         }
 
         AddBlockEventEvent event = new AddBlockEventEvent(
-            tag.getLong("tick"),
-            tag.getInt("x"), tag.getInt("y"), tag.getInt("z"),
+            tag.getLong("tick").orElse(0L),
+            tag.getInt("x").orElse(0), tag.getInt("y").orElse(0), tag.getInt("z").orElse(0),
             stateId,
-            tag.getInt("b0"), tag.getInt("b1"),
-            tag.getString("dimension"),
-            tag.getBoolean("shouldFail")
+            tag.getInt("b0").orElse(0), tag.getInt("b1").orElse(0),
+            tag.getString("dimension").orElse(""),
+            tag.getBoolean("shouldFail").orElse(false)
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

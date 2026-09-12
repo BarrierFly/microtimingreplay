@@ -44,7 +44,7 @@ public class MTRState {
             return false;
         if (activeProfile == null)
             return false;
-        return level == null || !activeProfile.outsideDimensionOrArea(level.dimension().location().toString());
+        return level == null || !activeProfile.outsideDimensionOrArea(level.dimension().identifier().toString());
     }
 
     public static MTRProfile getActiveProfile() {

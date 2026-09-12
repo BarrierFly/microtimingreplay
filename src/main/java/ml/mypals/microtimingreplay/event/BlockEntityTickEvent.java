@@ -1,7 +1,5 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import ml.mypals.microtimingreplay.util.MTRComponent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -77,10 +75,10 @@ public class BlockEntityTickEvent extends BlockPosEvent {
 
     public static BlockEntityTickEvent readNBT(CompoundTag tag) {
         BlockEntityTickEvent event = new BlockEntityTickEvent(
-                tag.getLong("tick"),
-                MTRNbt.getString(tag, "blockEntityType", "unknown"),
-                new BlockPos(tag.getInt("x"), tag.getInt("y"), tag.getInt("z")),
-                tag.getString("dimension")
+                tag.getLong("tick").orElse(0L),
+                tag.getString("blockEntityType").orElse("unknown"),
+                new BlockPos(tag.getInt("x").orElse(0), tag.getInt("y").orElse(0), tag.getInt("z").orElse(0)),
+                tag.getString("dimension").orElse("")
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

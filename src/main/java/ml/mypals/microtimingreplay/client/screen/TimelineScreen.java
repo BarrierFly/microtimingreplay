@@ -13,13 +13,15 @@ import ml.mypals.microtimingreplay.network.MTRPayloads;
 import ml.mypals.microtimingreplay.util.MTRComponent;
 import ml.mypals.microtimingreplay.util.MTRHelpText;
 import net.minecraft.ChatFormatting;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.WidgetTooltipHolder;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -505,7 +507,7 @@ public class TimelineScreen extends Screen {
     private void endDrag() {
         dragging = Drag.NONE;
         grabRemainder = 0;
-        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().getWindow(),
+        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().handle(),
                 GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
     }
 
@@ -802,7 +804,7 @@ public class TimelineScreen extends Screen {
 
         // Vanilla draws this during the outer render pass, so it lands above everything.
         stackTooltip.set(Tooltip.create(view.tooltip()));
-        stackTooltip.refreshTooltipForNextRenderPass(headerHovered, false, stackHeaderRect);
+        stackTooltip.refreshTooltipForNextRenderPass(graphics, mouseX, mouseY, headerHovered, false, stackHeaderRect);
     }
 
     private int detailLineCount() {
@@ -881,7 +883,10 @@ public class TimelineScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int scanCode = event.scancode();
+        int modifiers = event.modifiers();
         boolean control = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
 
@@ -918,19 +923,22 @@ public class TimelineScreen extends Screen {
             }
         }
 
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
         if (helpOpen) {
             helpOpen = false;
             return true;
         }
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (super.mouseClicked(event, doubled)) return true;
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
 
         if ((button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE
-                || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) && beginCameraDrag(mouseX, mouseY)) {
+                || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) && beginCameraDrag(event)) {
             return true;
         }
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && beginGrab(mouseX, mouseY)) {
@@ -1059,12 +1067,12 @@ public class TimelineScreen extends Screen {
     }
 
     /**
-     * {@code mouseScrolled} carries no modifier state in 26.1 — modifiers only ride on
+     * {@code mouseScrolled} carries no modifier state — modifiers only ride on
      * key and button events — so ask the window whether the key is physically down.
      */
     private boolean isKeyHeld(int left, int right) {
-        return InputConstants.isKeyDown(this.minecraft.getWindow().getWindow(), left)
-                || InputConstants.isKeyDown(this.minecraft.getWindow().getWindow(), right);
+        return InputConstants.isKeyDown(this.minecraft.getWindow(), left)
+                || InputConstants.isKeyDown(this.minecraft.getWindow(), right);
     }
 
     @Override
@@ -1210,7 +1218,9 @@ public class TimelineScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         switch (dragging) {
             case TIMELINE_V -> applyTimelineVDrag(mouseY);
             case TIMELINE_H -> applyTimelineHDrag(mouseX);
@@ -1227,19 +1237,19 @@ public class TimelineScreen extends Screen {
             }
             case GRAB_TIMELINE, GRAB_DETAIL, GRAB_SUMMARY -> applyGrab(dragX, dragY);
             case NONE -> {
-                return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+                return super.mouseDragged(event, dragX, dragY);
             }
         }
         return true;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         if (dragging != Drag.NONE) {
             endDrag();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
 
@@ -1300,7 +1310,7 @@ public class TimelineScreen extends Screen {
 
         dragging = target;
         grabRemainder = 0;
-        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().getWindow(),
+        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().handle(),
                 GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
         return true;
     }
@@ -1510,11 +1520,11 @@ public class TimelineScreen extends Screen {
         camera.reset(player.getEyePosition(), focus);
         return true;
     }
-    private boolean beginCameraDrag(double mouseX, double mouseY) {
-        if (!ClientReplayState.cameraFollow() || !overViewport(mouseX, mouseY)) return false;
+    private boolean beginCameraDrag(MouseButtonEvent event) {
+        if (!ClientReplayState.cameraFollow() || !overViewport(event.x(), event.y())) return false;
         if (!syncCamera()) return false;
-        dragging = hasShiftDown() ? Drag.CAMERA_PAN : Drag.CAMERA_ORBIT;
-        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().getWindow(),
+        dragging = (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0 ? Drag.CAMERA_PAN : Drag.CAMERA_ORBIT;
+        GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().handle(),
                 GLFW.GLFW_CURSOR,GLFW.GLFW_CURSOR_DISABLED);
         return true;
     }
@@ -1556,7 +1566,7 @@ public class TimelineScreen extends Screen {
         if (player == null || !camera.isPrimed()) return;
 
         Vec3 eye = camera.eyePosition();
-        player.moveTo(eye.x, eye.y - player.getEyeHeight(), eye.z, camera.yaw(), camera.pitch());
+        player.snapTo(eye.x, eye.y - player.getEyeHeight(), eye.z, camera.yaw(), camera.pitch());
         player.setYHeadRot(camera.yaw());
     }
 }

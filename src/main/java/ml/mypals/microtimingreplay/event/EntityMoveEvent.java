@@ -1,7 +1,5 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import ml.mypals.microtimingreplay.replay.EntityReplayManager;
 import ml.mypals.microtimingreplay.util.MTRComponent;
 import net.minecraft.ChatFormatting;
@@ -115,9 +113,9 @@ public class EntityMoveEvent extends Vec3PosEvent {
         Entity entity = EntityReplayManager.getEntity(level, uuid);
         if (entity != null) {
             if (forward) {
-                entity.absMoveTo(getX(), getY(), getZ(), yaw, pitch);
+                entity.absSnapTo(getX(), getY(), getZ(), yaw, pitch);
             } else {
-                entity.absMoveTo(oldX, oldY, oldZ, yaw, pitch);
+                entity.absSnapTo(oldX, oldY, oldZ, yaw, pitch);
             }
             entity.setDeltaMovement(0,0,0);
             EntityReplayManager.syncEntityPosition(level, entity);
@@ -148,21 +146,21 @@ public class EntityMoveEvent extends Vec3PosEvent {
 
     public static EntityMoveEvent readNBT(CompoundTag tag) {
         EntityMoveEvent event = new EntityMoveEvent(
-                tag.getLong("tick"),
-                tag.getString("entityUuid"),
-                tag.getString("entityType"),
-                tag.getDouble("oldX"),
-                tag.getDouble("oldY"),
-                tag.getDouble("oldZ"),
-                tag.getDouble("x"),
-                tag.getDouble("y"),
-                tag.getDouble("z"),
-                tag.getFloat("yaw"),
-                tag.getFloat("pitch"),
-                tag.getDouble("dx"),
-                tag.getDouble("dy"),
-                tag.getDouble("dz"),
-                MTRNbt.getString(tag, "dimension", "unknown")
+                tag.getLong("tick").orElse(0L),
+                tag.getString("entityUuid").orElse(""),
+                tag.getString("entityType").orElse(""),
+                tag.getDouble("oldX").orElse(0.0),
+                tag.getDouble("oldY").orElse(0.0),
+                tag.getDouble("oldZ").orElse(0.0),
+                tag.getDouble("x").orElse(0.0),
+                tag.getDouble("y").orElse(0.0),
+                tag.getDouble("z").orElse(0.0),
+                tag.getFloat("yaw").orElse(0.0f),
+                tag.getFloat("pitch").orElse(0.0f),
+                tag.getDouble("dx").orElse(0.0),
+                tag.getDouble("dy").orElse(0.0),
+                tag.getDouble("dz").orElse(0.0),
+                tag.getString("dimension").orElse("unknown")
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

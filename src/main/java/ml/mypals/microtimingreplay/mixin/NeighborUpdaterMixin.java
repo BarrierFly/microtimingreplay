@@ -24,7 +24,7 @@ public interface NeighborUpdaterMixin {
         if (MTRState.isRecording(level)) {
             if (!RecordingFilterConfig.isEnabled("neighbor_update")) return;
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = level.dimension().location().toString();
+            String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 long tick = level.getServer() != null ? level.getServer().getTickCount() - MTRState.getRecordStartTick() : 0;
                 MTRState.pushEvent(new UpdateEvent(tick, "NeighbourUpdate", pos));
@@ -36,7 +36,7 @@ public interface NeighborUpdaterMixin {
     private static void mtr$onExecuteUpdateReturn(Level level, BlockState state, BlockPos pos, Block changedBlock, BlockPos neighborPos, boolean movedByPiston, CallbackInfo ci) {
         if (MTRState.isRecording(level)) {
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = level.dimension().location().toString();
+            String dim = level.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 MTRState.popEvent();
             }
@@ -48,7 +48,7 @@ public interface NeighborUpdaterMixin {
         if (level instanceof Level realLevel && MTRState.isRecording(realLevel)) {
             if (!RecordingFilterConfig.isEnabled("shape_update")) return;
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = realLevel.dimension().location().toString();
+            String dim = realLevel.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 long tick = realLevel.getServer() != null ? realLevel.getServer().getTickCount() - MTRState.getRecordStartTick() : 0;
                 MTRState.pushEvent(new UpdateEvent(tick, "ShapeUpdate", pos));
@@ -60,7 +60,7 @@ public interface NeighborUpdaterMixin {
     private static void mtr$onExecuteShapeUpdateReturn(LevelAccessor level, Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit, CallbackInfo ci) {
         if (level instanceof Level realLevel && MTRState.isRecording(realLevel)) {
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = realLevel.dimension().location().toString();
+            String dim = realLevel.dimension().identifier().toString();
             if (profile != null && !profile.outsideArea(pos, dim)) {
                 MTRState.popEvent();
             }

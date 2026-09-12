@@ -5,6 +5,11 @@ import java.util.List;
 import net.minecraft.network.chat.Component;
 
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
 
 import ml.mypals.microtimingreplay.MicroTimingReplay;
 import net.minecraft.core.UUIDUtil;
@@ -165,7 +170,7 @@ public class EntityReplayManager {
         Entity entity = load(level, copy);
         if (entity == null) return null;
 
-        entity.absMoveTo(x, y, z, yaw, pitch);
+        entity.snapTo(x, y, z, yaw, pitch);
         finishStandIn(level, uuid, entity);
         return entity;
     }
@@ -188,7 +193,8 @@ public class EntityReplayManager {
     }
 
     private static Entity load(ServerLevel level, CompoundTag nbt) {
-        return EntityType.create(nbt, level).orElse(null);
+        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), nbt);
+        return EntityType.create(input, level, EntitySpawnReason.LOAD).orElse(null);
     }
 
     /**
@@ -213,7 +219,8 @@ public class EntityReplayManager {
         if (level != null && entity != null && MicroTimingReplay.server != null) {
             entity.setOldPosAndRot();
             entity.setDeltaMovement(Vec3.ZERO);
-            var teleportPacket = new ClientboundTeleportEntityPacket(entity);
+            var teleportPacket = ClientboundTeleportEntityPacket.teleport(entity.getId(),
+                    PositionMoveRotation.of(entity), Set.of(), entity.onGround());
             for (ServerPlayer player : MicroTimingReplay.server.getPlayerList().getPlayers()) {
                 if (player.level() == level) {
                     player.connection.send(teleportPacket);

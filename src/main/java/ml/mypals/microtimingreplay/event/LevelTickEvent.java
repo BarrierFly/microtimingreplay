@@ -1,13 +1,11 @@
 package ml.mypals.microtimingreplay.event;
 
-import ml.mypals.microtimingreplay.util.MTRNbt;
-
 import ml.mypals.microtimingreplay.util.MTRComponent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class LevelTickEvent extends PhaseEvent {
     public static final String TYPE = "levelTick";
@@ -76,9 +74,9 @@ public class LevelTickEvent extends PhaseEvent {
 
     public static LevelTickEvent readNBT(CompoundTag tag) {
         LevelTickEvent event = new LevelTickEvent(
-            tag.getLong("tick"),
-            MTRNbt.getString(tag, "phaseName", "LevelTickPhase"),
-            tag.getString("dimension")
+            tag.getLong("tick").orElse(0L),
+            tag.getString("phaseName").orElse("LevelTickPhase"),
+            tag.getString("dimension").orElse("")
         );
         MTREvent.readChildrenNBT(event, tag);
         return event;

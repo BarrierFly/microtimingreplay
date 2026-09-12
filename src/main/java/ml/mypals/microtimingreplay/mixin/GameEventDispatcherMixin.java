@@ -26,7 +26,7 @@ public class GameEventDispatcherMixin {
         boolean bl = original.call(instance, serverLevel, gameEventHolder, context, vec3);
         if (bl && MTRState.isRecording(serverLevel)) {
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = serverLevel.dimension().location().toString();
+            String dim = serverLevel.dimension().identifier().toString();
             if (profile != null && !profile.outsideAreaVec3(vec3, dim)) {
                 MTRState.recordStep(
                         new PostGameEventEvent(
@@ -47,7 +47,7 @@ public class GameEventDispatcherMixin {
         boolean bl = original.call(instance, serverLevel, gameEventHolder, context, vec3);
         if (bl && MTRState.isRecording(serverLevel)) {
             MTRProfile profile = MTRState.getActiveProfile();
-            String dim = serverLevel.dimension().location().toString();
+            String dim = serverLevel.dimension().identifier().toString();
             if (profile != null && !profile.outsideAreaVec3(vec3, dim)) {
                 MTRState.recordStep(
                         new PostGameEventEvent(

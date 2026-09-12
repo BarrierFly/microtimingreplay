@@ -48,7 +48,7 @@ public abstract class LevelMixin {
             }
             MTRProfile activeProfile = MTRState.getActiveProfile();
             if (activeProfile != null) {
-                if (activeProfile.outsideArea(pos, this.dimension().location().toString())) {
+                if (activeProfile.outsideArea(pos, this.dimension().identifier().toString())) {
                     return original.call(pos, blockState, updateFlags, updateLimit);
                 }
                 BlockState oldState = this.getBlockState(pos);
@@ -59,7 +59,7 @@ public abstract class LevelMixin {
                 SetBlockEvent event = new SetBlockEvent(
                     currentTick, updateFlags, updateLimit,
                     pos.getX(), pos.getY(), pos.getZ(),
-                    oldStateId, newStateId, false, this.dimension().location().toString()
+                    oldStateId, newStateId, false, this.dimension().identifier().toString()
                 );
 
                 MTRState.pushEvent(event);
@@ -82,7 +82,7 @@ public abstract class LevelMixin {
         Level level = (Level) (Object) this;
         if (!MTRState.isRecording(level)) return;
 
-        String dim = this.dimension().location().toString();
+        String dim = this.dimension().identifier().toString();
         MTRProfile activeProfile = MTRState.getActiveProfile();
 
         if (blockEntity instanceof PistonMovingBlockEntity piston) {
@@ -127,7 +127,7 @@ public abstract class LevelMixin {
         }
 
         MTRProfile profile = MTRState.getActiveProfile();
-        String dim = this.dimension().location().toString();
+        String dim = this.dimension().identifier().toString();
         if (profile == null || profile.outsideArea(ticker.getPos(), dim)) {
             original.call(ticker);
             return;

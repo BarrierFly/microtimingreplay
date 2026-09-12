@@ -29,7 +29,7 @@ public abstract class PlayerTickMixin {
         }
 
         MTRProfile profile = MTRState.getActiveProfile();
-        String dim = level.dimension().location().toString();
+        String dim = level.dimension().identifier().toString();
         if (profile == null || profile.outsideAreaVec3(this.player.position(), dim)) {
             original.call();
             return;

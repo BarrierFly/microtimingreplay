@@ -78,15 +78,15 @@ public class StackTraceManager {
         traces().clear();
         if (root == null || !root.contains("steps")) return;
 
-        ListTag stepsList = root.getList("steps", Tag.TAG_COMPOUND);
+        ListTag stepsList = root.getList("steps").orElse(new ListTag());
         for (int i = 0; i < stepsList.size(); i++) {
-            CompoundTag stepTag = stepsList.getCompound(i);
+            CompoundTag stepTag = stepsList.getCompound(i).orElse(new CompoundTag());
             int step = MTRNbt.getInt(stepTag, "step", -1);
             if (step >= 0 && stepTag.contains("lines")) {
-                ListTag linesTag = stepTag.getList("lines", Tag.TAG_STRING);
+                ListTag linesTag = stepTag.getList("lines").orElse(new ListTag());
                 List<String> lines = new ArrayList<>();
                 for (int j = 0; j < linesTag.size(); j++) {
-                    lines.add(linesTag.getString(j));
+                    linesTag.getString(j).ifPresent(lines::add);
                 }
                 traces().put(step, lines);
             }

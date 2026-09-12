@@ -31,7 +31,7 @@ public abstract class LevelTicksMixin<T> {
             String dimension = "";
             for (ServerLevel level : MicroTimingReplay.server.getAllLevels()) {
                 if (level.getBlockTicks() == (Object) this || level.getFluidTicks() == (Object) this) {
-                    dimension = level.dimension().location().toString();
+                    dimension = level.dimension().identifier().toString();
                     break;
                 }
 

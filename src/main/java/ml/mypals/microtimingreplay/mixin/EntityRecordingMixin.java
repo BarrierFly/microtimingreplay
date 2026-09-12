@@ -37,7 +37,7 @@ public abstract class EntityRecordingMixin {
             if (!RecordingFilterConfig.isEnabled("entity_despawn")) return;
             MTRProfile activeProfile = MTRState.getActiveProfile();
             if (activeProfile != null) {
-                String dim = entity.level().dimension().location().toString();
+                String dim = entity.level().dimension().identifier().toString();
                 if (!activeProfile.outsideAreaVec3(entity.position(), dim)) {
                     long currentTick = MicroTimingReplay.server.getTickCount() - MTRState.getRecordStartTick();
 
@@ -77,7 +77,7 @@ public abstract class EntityRecordingMixin {
 
             MTRProfile activeProfile = MTRState.getActiveProfile();
             if (activeProfile != null) {
-                String dim = entity.level().dimension().location().toString();
+                String dim = entity.level().dimension().identifier().toString();
                 Vec3 oldPos = entity.position();
 
                 original.call(type, vec);

@@ -7,6 +7,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -125,34 +126,34 @@ public class HelpScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (super.mouseClicked(event, doubled)) return true;
 
-        if (maxScroll() > 0 && mouseX >= this.width - 6 - V_SCROLLBAR && mouseX < this.width - 6
-                && mouseY >= LIST_TOP && mouseY < listBottom()) {
+        if (maxScroll() > 0 && event.x() >= this.width - 6 - V_SCROLLBAR && event.x() < this.width - 6
+                && event.y() >= LIST_TOP && event.y() < listBottom()) {
             dragging = true;
-            applyDrag(mouseY);
+            applyDrag(event.y());
             return true;
         }
         return false;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         if (dragging) {
-            applyDrag(mouseY);
+            applyDrag(event.y());
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         if (dragging) {
             dragging = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     private void applyDrag(double mouseY) {
