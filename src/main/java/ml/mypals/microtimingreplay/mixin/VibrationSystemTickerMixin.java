@@ -2,7 +2,6 @@ package ml.mypals.microtimingreplay.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import ml.mypals.microtimingreplay.MTRState;
 import ml.mypals.microtimingreplay.event.ReceivedGameEventEvent;
 import ml.mypals.microtimingreplay.profile.MTRProfile;
@@ -20,8 +19,9 @@ import org.spongepowered.asm.mixin.injection.At;
 public interface VibrationSystemTickerMixin {
 
     @WrapOperation(method = "receiveVibration", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/gameevent/vibrations/VibrationSystem$User;onReceiveVibration(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/Holder;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity;F)V"))
-    private static void mtr$onReceiveVibration(VibrationSystem.User instance, ServerLevel serverLevel, BlockPos origin, Holder<GameEvent> gameEventHolder, @Nullable Entity sourceEntity, @Nullable Entity projOwner, float v, Operation<Void> original, @Local(name = "blockPos2") BlockPos destination) {
+    private static void mtr$onReceiveVibration(VibrationSystem.User instance, ServerLevel serverLevel, BlockPos origin, Holder<GameEvent> gameEventHolder, @Nullable Entity sourceEntity, @Nullable Entity projOwner, float v, Operation<Void> original) {
         if (MTRState.isRecording(serverLevel)) {
+            BlockPos destination = instance.getPositionSource().getPosition(serverLevel).map(BlockPos::containing).orElse(origin);
             MTRProfile profile = MTRState.getActiveProfile();
             String dim = serverLevel.dimension().location().toString();
             boolean inside = profile != null && (!profile.outsideArea(destination, dim) || !profile.outsideArea(origin, dim));
